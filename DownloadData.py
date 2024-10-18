@@ -121,7 +121,7 @@ def saveIndexStock():
 # Main function
 def main():
     # print(fetcher.fetchCodes(12))
-    stockDict=getData()
+    getData()
     # UpdateFullStockData(stockDict)
     # print(stockDict.keys())
     # print(stockDict["AVROIND"].keys())

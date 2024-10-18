@@ -13,7 +13,7 @@ You need to run the [FullDataDownload.py](FullDataDownload.py) only once then yo
 
 `python UpdateData.py`
 
-You can edit the MakePrediciton in [Startegy.py](Startegy.py) file to run code on your startegy and run
+You can edit the MakePrediciton in [Startegy.py](Prediction/Startegy.py) file to run code on your startegy and run
 
 `python BackTesting.py`
 
