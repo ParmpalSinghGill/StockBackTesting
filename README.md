@@ -9,7 +9,7 @@ Download full back Data of all stock list in NSE InDia
 
 `python FullDataDownload.py`
 
-You need to run the [FullDataDownload.py](FullDataDownload.py) only once then you can run the [UpdateData.py](UpdateData.py) daily basis to update the stock data by
+You need to run the [FullDataDownload.py](DataProcessing/FullDataDownload.py) only once then you can run the [UpdateData.py](UpdateData.py) daily basis to update the stock data by
 
 `python UpdateData.py`
 

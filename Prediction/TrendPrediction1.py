@@ -1,15 +1,28 @@
-def identify_all_trends(stock, from_date, to_date, window_size=5, identify='both'):
+# Copyright 2021-Present Vedant Kothari
+# See LICENSE for details.
+# https://github.com/dopevog/pytrend/blob/main/pytrend/identification.py
+
+import numpy as np
+import pandas as pd
+
+from statistics import mean
+
+
+import datetime
+import string
+
+def identify_df_trends(df, column, window_size=5, identify='both'):
+    #Works But Indetify Trend After it get finish in most of time
     """
-    This function retrieves historical data from the introduced `stock` between two dates from Investing via investpy;
-    and that data is later going to be analysed in order to detect/identify trends over a certain date range. A trend
-    is considered so based on the window_size, which specifies the number of consecutive days which lead the algorithm
-    to identify the market behaviour as a trend. So on, this function will identify both up and down trends and will
-    remove the ones that overlap, keeping just the longer trend and discarding the nested trend.
+    This function receives as input a pandas.DataFrame from which data is going to be analysed in order to
+    detect/identify trends over a certain date range. A trend is considered so based on the window_size, which
+    specifies the number of consecutive days which lead the algorithm to identify the market behaviour as a trend. So
+    on, this function will identify both up and down trends and will remove the ones that overlap, keeping just the
+    longer trend and discarding the nested trend.
 
     Args:
-        stock (:obj:`str`): symbol of the stock to retrieve historical data from.
-        from_date (:obj:`str`): date as `str` formatted as `dd/mm/yyyy`, from where data is going to be retrieved.
-        to_date (:obj:`str`): date as `str` formatted as `dd/mm/yyyy`, until where data is going to be retrieved.
+        df (:obj:`pandas.DataFrame`): dataframe containing the data to be analysed.
+        column (:obj:`str`): name of the column from where trends are going to be identified.
         window_size (:obj:`window`, optional): number of days from where market behaviour is considered a trend.
         identify (:obj:`str`, optional):
             which trends does the user wants to be identified, it can either be 'both', 'up' or 'down'.
@@ -20,34 +33,29 @@ def identify_all_trends(stock, from_date, to_date, window_size=5, identify='both
             using `investpy`, with a new column which identifies every trend found on the market between two dates
             identifying when did the trend started and when did it end. So the additional column contains labeled date
             ranges, representing both bullish (up) and bearish (down) trends.
-
     Raises:
         ValueError: raised if any of the introduced arguments errored.
     """
 
-    if stock and not isinstance(stock, str):
-        raise ValueError("stock argument needs to be a `str`.")
+    if df is None:
+        raise ValueError("df argument is mandatory and needs to be a `pandas.DataFrame`.")
 
-    if not stock:
-        raise ValueError("stock parameter is mandatory and must be a valid stock symbol.")
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("df argument is mandatory and needs to be a `pandas.DataFrame`.")
 
-    stock = unidecode(stock.strip().lower())
+    if column is None:
+        raise ValueError("column parameter is mandatory and must be a valid column name.")
 
-    try:
-        datetime.datetime.strptime(from_date, '%d/%m/%Y')
-    except ValueError:
-        raise ValueError("incorrect from_date date format, it should be 'dd/mm/yyyy'.")
+    if column and not isinstance(column, str):
+        raise ValueError("column argument needs to be a `str`.")
 
-    try:
-        datetime.datetime.strptime(to_date, '%d/%m/%Y')
-    except ValueError:
-        raise ValueError("incorrect to_date format, it should be 'dd/mm/yyyy'.")
-
-    start_date = datetime.datetime.strptime(from_date, '%d/%m/%Y')
-    end_date = datetime.datetime.strptime(to_date, '%d/%m/%Y')
-
-    if start_date >= end_date:
-        raise ValueError("to_date should be greater than from_date, both formatted as 'dd/mm/yyyy'.")
+    if isinstance(df, pd.DataFrame):
+        if column not in df.columns:
+            raise ValueError("introduced column does not match any column from the specified `pandas.DataFrame`.")
+        else:
+            if df[column].dtype not in ['int64', 'float64']:
+                raise ValueError("supported values are just `int` or `float`, and the specified column of the "
+                                 "introduced `pandas.DataFrame` is " + str(df[column].dtype))
 
     if not isinstance(window_size, int):
         raise ValueError('window_size must be an `int`')
@@ -61,22 +69,16 @@ def identify_all_trends(stock, from_date, to_date, window_size=5, identify='both
     if isinstance(identify, str) and identify not in ['both', 'up', 'down']:
         raise ValueError('identify should be a `str` contained in [both, up, down]!')
 
-    try:
-        df = pdr.get_data_yahoo(stock, start=from_date, end=to_date)
-
-    except Exception as e:
-        raise RuntimeError(f'investpy function call failed with Exception: {e}!')
-
     objs = list()
 
     up_trend = {
         'name': 'Up Trend',
-        'element': np.negative(df['Close'])
+        'element': np.negative(df[column])
     }
 
     down_trend = {
         'name': 'Down Trend',
-        'element': df['Close']
+        'element': df[column]
     }
 
     if identify == 'both':
@@ -113,7 +115,6 @@ def identify_all_trends(stock, from_date, to_date, window_size=5, identify='both
                         'from': df.index.tolist()[from_trend],
                         'to': df.index.tolist()[to_trend],
                     }
-
                     trends.append(trend)
 
                 limit = None
@@ -194,3 +195,17 @@ def identify_all_trends(stock, from_date, to_date, window_size=5, identify='both
                 df.loc[index, 'Down Trend'] = down_label
 
         return df
+
+
+def findpytrend(pastData,n=20,lastNDays=2):
+    trenddata = identify_df_trends(pastData[-3 * n:], "Close", window_size=n)
+    if "Down Trend" not in trenddata.columns and "Up Trend" not in trenddata.columns: return None,None,None
+    lastdays = trenddata[-lastNDays:].dropna()
+    Trend = "Down Trend" if "Down Trend" in lastdays.columns else "Up Trend"
+    if lastdays.shape[0] == 0: return None,None,None
+    trenddata[Trend] = trenddata[Trend].fillna("")
+    TrendSymbol = trenddata[Trend].values[-3]
+    TrenDf = trenddata[trenddata[Trend] == TrendSymbol]
+    TrendStart, TrnedEnd = TrenDf.index[0].strftime('%Y-%m-%d'), TrenDf.index[-1].strftime('%Y-%m-%d')
+    return Trend.split()[0],TrendStart, TrnedEnd
+

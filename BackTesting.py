@@ -6,7 +6,7 @@ import pandas as pd
 from Prediction.Startegy import MakePrediciton
 from classes.ColorText import  colorText
 import concurrent.futures
-from DataLoad import getData,getDatFrame
+from DataProcessing.DataLoad import getData,getDatFrame
 
 
 def getBrokrage(ammount,brokragePercent=0.24):
@@ -34,7 +34,7 @@ def TargetStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.002
     TradesList,Positions = [],[]
     if df.shape[0]<startindays-10: return
     for i in range(startindays,df.shape[0]):
-        pastData=df[:i]
+        today,pastData = df.iloc[i],df[:i]
         High,Low=pastData["High"].values[-1],pastData["Low"].values[-1]
         if len(Positions)>0:
             remaniedPositions=[]
@@ -48,17 +48,19 @@ def TargetStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.002
                 else:
                     remaniedPositions.append(position)
             Positions=remaniedPositions
-        today = df.iloc[i]
+        signal, side, currentPrice, stoploss, Target = MakePrediciton(pastData)
         if ammount>df["Close"].values[i-1]:
-            signal, side, currentPrice, stoploss, Target=MakePrediciton(pastData)
-            if signal and side:
+            if signal and side=="BUY" and len(Positions)==0:
                 if today["Open"]<Target-(Target-currentPrice)/2 and today["Open"]>currentPrice:
                     buyprice=today["Open"]+today["Open"]*discountpercent
                     quantity=ammount//buyprice
                     if quantity>0 and ammount>quantity*buyprice:
                         Positions.append({"Quantity":quantity,"BuyPrice":buyprice,"Target":Target,"StopLoss":stoploss,"Buy Date":df.index[i]})
                         ammount-=quantity*buyprice-getBrokrage(quantity*buyprice)
-    LatestPrice=df["Close"].values[-1]
+        elif signal and side == "SELL" and len(Positions)>0:
+            sellprice=today["Opend"]*0.9999
+            ammount = SellStock(ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
+        LatestPrice=df["Close"].values[-1]
     for position in Positions:
         sellprice = LatestPrice - LatestPrice * discountpercent
         ammount = SellStock(ammount, sellprice, i, position, TradesList, df,reason="InHand")
@@ -69,7 +71,7 @@ def TrailingStopLosssFixTargetTesting(df,ammount=10000,startindays=100,discountp
     TradesList,Positions = [],[]
     if df.shape[0]<startindays-10: return
     for i in range(startindays,df.shape[0]):
-        pastData=df[:i]
+        pastData,today=df[:i],df.iloc[i]
         High,Low,Close=pastData["High"].values[-1],pastData["Low"].values[-1],pastData["Close"].values[-1]
         if len(Positions)>0:
             remaniedPositions=[]
@@ -94,28 +96,30 @@ def TrailingStopLosssFixTargetTesting(df,ammount=10000,startindays=100,discountp
                         if printFlag:print(position)
                     remaniedPositions.append(position)
             Positions=remaniedPositions
-        today = df.iloc[i]
+        signal, side, currentPrice, stoploss, Target = MakePrediciton(pastData)
         if ammount>df["Close"].values[i-1]:
-            signal, side, currentPrice, stoploss, Target=MakePrediciton(pastData)
-            if signal and side:
+            if signal and side=="BUY" and len(Positions)==0:
                 if today["Open"]<Target-(Target-currentPrice)/2 and today["Open"]>currentPrice:
                     buyprice=today["Open"]+today["Open"]*discountpercent
                     quantity=ammount//buyprice
                     if quantity>0 and ammount>quantity*buyprice:
                         Positions.append({"Quantity":quantity,"BuyPrice":buyprice,"Target":Target,"StopLoss":stoploss,"Buy Date":df.index[i]})
                         ammount-=quantity*buyprice-getBrokrage(quantity*buyprice)
+        elif signal and side == "SELL" and len(Positions) > 0:
+            sellprice = today["Open"] * 0.9999
+            ammount = SellStock(ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
     LatestPrice=df["Close"].values[-1]
     for position in Positions:
         sellprice = LatestPrice - LatestPrice * discountpercent
         ammount = SellStock(ammount, sellprice, i, position, TradesList, df,reason="InHand")
-    return position,ammount,TradesList,LatestPrice
+    return Positions,ammount,TradesList,LatestPrice
 
 
 def TrailingStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.002,trailtriggerpercent=5,printFlag=False):
     TradesList,Positions = [],[]
     if df.shape[0]<startindays-10: return
     for i in range(startindays,df.shape[0]):
-        pastData=df[:i]
+        pastData,today=df[:i],df.iloc[i]
         High,Low,Close=pastData["High"].values[-1],pastData["Low"].values[-1],pastData["Close"].values[-1]
         if len(Positions)>0:
             remaniedPositions=[]
@@ -136,16 +140,18 @@ def TrailingStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.0
                         if printFlag:print(position)
                     remaniedPositions.append(position)
             Positions=remaniedPositions
-        today = df.iloc[i]
+        signal, side, currentPrice, stoploss, Target = MakePrediciton(pastData)
         if ammount>df["Close"].values[i-1]:
-            signal, side, currentPrice, stoploss, Target=MakePrediciton(pastData)
-            if signal and side:
+            if signal and side=="BUY" and len(Positions)==0:
                 if today["Open"]<Target-(Target-currentPrice)/2 and today["Open"]>currentPrice:
                     buyprice=today["Open"]+today["Open"]*discountpercent
                     quantity=ammount//buyprice
                     if quantity>0 and ammount>quantity*buyprice:
                         Positions.append({"Quantity":quantity,"BuyPrice":buyprice,"Target":Target,"StopLoss":stoploss,"Buy Date":df.index[i]})
                         ammount-=quantity*buyprice-getBrokrage(quantity*buyprice)
+        elif signal and side == "SELL" and len(Positions) > 0:
+            sellprice = today["Opend"] * 0.9999
+            ammount = SellStock(ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
     LatestPrice=df["Close"].values[-1]
     for position in Positions:
         sellprice = LatestPrice - LatestPrice * discountpercent
@@ -219,19 +225,23 @@ def AllStock():
         ProcessStock(stockdict,k,printResults=True)
 
 def FurtherAnalaysis(df):
+    print(df.columns)
     longtermgain= df["longtermgain"].sum()
-    TraidingProfit= df["TraidingGain"].sum()-df["TraidingLoss"].sum()
+    if "TraidingLoss" in df.columns:
+        TraidingProfit= df["TraidingGain"].sum()-df["TraidingLoss"].sum()
+    else:
+        TraidingProfit = df["TraidingGain"].sum()
     if TraidingProfit>0:
         if TraidingProfit>longtermgain:
             print(f"Well Done you earn {TraidingProfit/longtermgain*100:.2f}% better in Traiding")
         else:
-            print(f"Long Term Gain is {longtermgain/TraidingProfit*100:.2}% better then Traiding Stay invested")
+            print(f"Long Term Gain is {longtermgain/TraidingProfit*100:.2}% better then Traiding Stay Invested")
     else:
         print(f"You are in loss with Traiding stay with Investment")
 
 
 def AllStockMultProcessing(type="ALL",method="SL&T"):
-    assert method in ("TSL&T","TSL","SL&T")
+    assert method in ("TSL&T","TSL","SL&T") #TrailingStopLosssFixTargetTesting TrailingStopLosssFixTargetTesting TargetStopLosssTesting
     stockdict=getData()
     if type=="ALL":
         keys=stockdict.keys()
@@ -250,19 +260,14 @@ def AllStockMultProcessing(type="ALL",method="SL&T"):
     df.to_csv(f"Results/Results{method}.csv",index=None)
     print("Total Time Taken ",time.time()-st,"Results Save at",f"Results/Results{method}.csv")
 
-# AllStock()
-stype="Nifty50"
-# method="SL&T"
-# method="TSL&T"
-method="TSL"
-AllStockMultProcessing(stype,method=method)
-FurtherAnalaysis(pd.read_csv(f"Results{method}.csv"))
-# SingleStock()
+if __name__ == '__main__':
 
-"""
-100  120 80 5
-105  120 85 
-110  120 90
+    # AllStock()
+    stype="Nifty50"
+    # method="SL&T"
+    # method="TSL&T"
+    method="TSL"
+    # AllStockMultProcessing(stype,method=method)
+    FurtherAnalaysis(pd.read_csv(f"Results/Results{method}.csv"))
+    # SingleStock()
 
-
-"""

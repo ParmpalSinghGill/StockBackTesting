@@ -16,7 +16,7 @@ from classes.ColorText import colorText
 parser = configparser.ConfigParser(strict=False)
 
 # Default attributes for Downloading Cache from Git repo
-default_period = '600d'
+default_period = '300d'
 default_duration = '1d'
 StopFolder="Stocks/"
 os.makedirs(StopFolder,exist_ok=True)

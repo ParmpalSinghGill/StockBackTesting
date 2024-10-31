@@ -12,7 +12,7 @@ def getDatFrame(stockData):
 
 
 def getData(key=None):
-    with open("StockData/AllSTOCKS.pk","rb") as f:
+    with open("StockData/AllSTOCKS.pk", "rb") as f:
         Fulldata=pk.load(f)
     if key is None:
         return Fulldata

@@ -18,6 +18,8 @@ import pandas as pd,pickle as pk
 import multiprocessing
 import classes.Fetcher as Fetcher
 import classes.ConfigManager as ConfigManager
+# os.chdir("../")
+
 
 configManager = ConfigManager.tools()
 fetcher = Fetcher.tools(configManager)
@@ -85,7 +87,7 @@ def getDatFrame(stockData):
 
 
 def UpdateFullStockData(stockDict):
-    with open("StockData/AllSTOCKS.pk", "rb") as f:
+    with open("../StockData/AllSTOCKS.pk", "rb") as f:
         FullData=pk.load(f)
     Nodata=0
     for k,v in stockDict.items():
@@ -100,7 +102,7 @@ def UpdateFullStockData(stockDict):
         fuldatadf=getDatFrame(FullData[k])
         fuldatadf=pd.concat([fuldatadf, df[~df.index.isin(fuldatadf.index)]])
         FullData[k]={"data":fuldatadf.values,"columns":fuldatadf.columns,"index":fuldatadf.index}
-    with open("StockData/AllSTOCKS.pk", "wb") as f:
+    with open("../StockData/AllSTOCKS.pk", "wb") as f:
         pk.dump(FullData,f)
     print(f"All Stock Updated {Nodata} Stock with no Data  out of {len(FullData)}")
 
@@ -115,7 +117,7 @@ def getData():
 def saveIndexStock():
     nifty50 = fetcher.fetchCodes(1)
     indexlist={"Nifty50":nifty50}
-    with open("StockData/Indexices.pk","wb") as f:
+    with open("../StockData/Indexices.pk", "wb") as f:
         pk.dump(indexlist,f)
 
 # Main function

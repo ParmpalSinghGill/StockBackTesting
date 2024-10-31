@@ -11,6 +11,25 @@ from statistics import mean
 import datetime
 import string
 
+
+def AddTrendToList(df,values,trends,window_size,from_trend):
+    if len(values) > window_size:
+        min_value = min(values)
+
+        for counter, item in enumerate(values, 0):
+            if item == min_value:
+                break
+
+        to_trend = from_trend + counter
+
+        trend = {
+            'from': df.index.tolist()[from_trend],
+            'to': df.index.tolist()[to_trend],
+        }
+        trends.append(trend)
+    return trends
+
+
 def identify_df_trends(df, column, window_size=5, identify='both'):
     #Works But Indetify Trend After it get finish in most of time
     """
@@ -82,8 +101,8 @@ def identify_df_trends(df, column, window_size=5, identify='both'):
     }
 
     if identify == 'both':
-        objs.append(up_trend)
         objs.append(down_trend)
+        objs.append(up_trend)
     elif identify == 'up':
         objs.append(up_trend)
     elif identify == 'down':
@@ -102,37 +121,21 @@ def identify_df_trends(df, column, window_size=5, identify='both'):
                 values.append(value)
                 limit = mean(values)
             elif limit and limit < value:
-                if len(values) > window_size:
-                    min_value = min(values)
-
-                    for counter, item in enumerate(values, 0):
-                        if item == min_value:
-                            break
-
-                    to_trend = from_trend + counter
-
-                    trend = {
-                        'from': df.index.tolist()[from_trend],
-                        'to': df.index.tolist()[to_trend],
-                    }
-                    trends.append(trend)
-
+                trends=AddTrendToList(df, values, trends, window_size, from_trend)
                 limit = None
                 values = list()
             else:
                 from_trend = index
-
                 values.append(value)
                 limit = mean(values)
-
+        trends = AddTrendToList(df, values, trends, window_size, from_trend)
         results[obj['name']] = trends
 
     if identify == 'both':
         up_trends = list()
-
         for up in results['Up Trend']:
             flag = True
-
+            #Remove Sub DownTrend
             for down in results['Down Trend']:
                 if down['from'] < up['from'] < down['to'] or down['from'] < up['to'] < down['to']:
                     if (up['to'] - up['from']).days > (down['to'] - down['from']).days:
@@ -195,3 +198,17 @@ def identify_df_trends(df, column, window_size=5, identify='both'):
                 df.loc[index, 'Down Trend'] = down_label
 
         return df
+
+
+def findpytrend(pastData,n=20,lastNDays=2):
+    trenddata = identify_df_trends(pastData[-3 * n:], "Close", window_size=n)
+    if "Down Trend" not in trenddata.columns and "Up Trend" not in trenddata.columns: return None,None,None
+    lastdays = trenddata[-lastNDays:].dropna()
+    Trend = "Down Trend" if "Down Trend" in lastdays.columns else "Up Trend"
+    if lastdays.shape[0] == 0: return None,None,None
+    trenddata[Trend] = trenddata[Trend].fillna("")
+    TrendSymbol = trenddata[Trend].values[-3]
+    TrenDf = trenddata[trenddata[Trend] == TrendSymbol]
+    TrendStart, TrnedEnd = TrenDf.index[0].strftime('%Y-%m-%d'), TrenDf.index[-1].strftime('%Y-%m-%d')
+    return Trend.split()[0],TrendStart, TrnedEnd
+

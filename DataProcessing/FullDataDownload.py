@@ -4,6 +4,7 @@ import pickle as pk
 import classes.Fetcher as Fetcher
 import classes.ConfigManager as ConfigManager
 
+os.chdir("../")
 configManager = ConfigManager.tools()
 fetcher = Fetcher.tools(configManager)
 
