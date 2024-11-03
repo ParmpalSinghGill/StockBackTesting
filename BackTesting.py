@@ -253,11 +253,16 @@ def ArangeTraidingResults(key,method,df,baseammount,longtermgain, ammount,Trades
     return results
 
 def saveTrades(TradesList,method,key):
-    os.makedirs(f"Results/{method}",exist_ok=True)
-    df=pd.DataFrame(TradesList)
-    df["Profit"]=df["BuyPrice"]<df["SelPrice"]
-    df.to_csv(f"Results/{method}/{key}.csv",index=None)
-
+    try:
+        if len(TradesList)==0: return
+        os.makedirs(f"Results/{method}",exist_ok=True)
+        df=pd.DataFrame(TradesList)
+        print(df)
+        df["Profit"]=df["BuyPrice"]<df["SelPrice"]
+        df.to_csv(f"Results/{method}/{key}.csv",index=None)
+    except Exception as e:
+        logger.critical(f"Issue in {key}")
+        raise e
 
 def DobackTesting(df,Key="",ammount=10000,startindays=100,discountpercent=.002,method="SL&T",printResults=False):
     if CONFIG.STARTDATE is not None and CONFIG.ENDDATE is not None:
@@ -354,5 +359,5 @@ if __name__ == '__main__':
     # method="TSL"
     AllStockMultProcessing(stype,method=method)
     FurtherAnalaysis(pd.read_csv(f"Results/Results{method}.csv"))
-    # SingleStock()
+    # SingleStock("MARUTI")
 
