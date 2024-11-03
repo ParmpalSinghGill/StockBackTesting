@@ -182,8 +182,8 @@ class tools:
                 print("")
                 tools.loadStockData(stockDict, configManager, proxyServer)
             else:
-                print(colorText.BOLD + colorText.FAIL +
-                      "[+] Cache unavailable on Screenipy server, Continuing.." + colorText.END)
+                # print(colorText.BOLD + colorText.FAIL +"[+] Cache unavailable on Screenipy server, Continuing.." + colorText.END)
+                print(colorText.BOLD + colorText.FAIL +"[+] Cache unavailable on Screenipy server, Continuing.." + colorText.END)
 
     # Save screened results to excel
     def promptSaveResults(df):

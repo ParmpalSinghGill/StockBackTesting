@@ -1,20 +1,41 @@
+import datetime
 import os
 import pickle as pk
 import time,itertools
+from Prediction import CONFIG
 
 import pandas as pd
 from Prediction.Startegy import MakePrediciton
 from classes.ColorText import  colorText
 import concurrent.futures
 from DataProcessing.DataLoad import getData,getDatFrame
+from PlotCode.PlotCandles import PlotMACDForTrade
+import logging
+DEBUG=False
+DEBUGEVERY=True
+if not DEBUG: DEBUGEVERY=False
+# Create a console handler and set its level
+console_handler = logging.StreamHandler()
+if DEBUG: console_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+# Add the handler to the logger
+logger=logging.getLogger("BackTesting")
+logger.addHandler(console_handler)
+if DEBUG: logger.setLevel(logging.DEBUG)
 
 
 def getBrokrage(ammount,brokragePercent=0.24):
     return ammount*brokragePercent/100
-def SellStock(ammount,sellprice,i,position,TradesList,df,reason="Target"):
+def SellStock(Key,ammount,sellprice,i,position,TradesList,df,reason="Target"):
+    logger.debug(f"Bought at {position['BuyPrice']:.2f} Selling at {sellprice:.2f} and quantity {position['Quantity']} reason {reason}")
     ammount += position["Quantity"] * sellprice-getBrokrage(position["Quantity"] * sellprice)
     position.update({"SelDate": df.index[i - 1], "SelPrice": sellprice, "Reason": reason})
     TradesList.append(position)
+    logger.debug("@^#*" * 25)
+    if DEBUGEVERY:
+        PlotMACDForTrade(df,position,Key=Key,n=20)
+    # if DEBUGEVERY: input("NEXT?")
     return ammount
 
 def calculateInvestmentGain(df, ammount=10000, startindays=100):
@@ -30,44 +51,75 @@ def calculateInvestmentGain(df, ammount=10000, startindays=100):
     # print("Total Long term gain is ",ammount-baseammount,"With ",stockcount,"Shares")
     return ammount-baseammount
 
-def TargetStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.002):
+def TargetStopLosssTesting(Key,df,ammount=10000,startindays=100,discountpercent=.002):
+    """
+    method is SL&T
+    :param df:  Datamframe on which you want to Test
+    :param ammount: ammount to spend
+    :param startindays:
+    :param discountpercent:
+    :return:
+    """
     TradesList,Positions = [],[]
     if df.shape[0]<startindays-10: return
     for i in range(startindays,df.shape[0]):
-        today,pastData = df.iloc[i],df[:i]
+        today,todatedate,pastData = df.iloc[i],df.index[i],df[:i]
         High,Low=pastData["High"].values[-1],pastData["Low"].values[-1]
         if len(Positions)>0:
             remaniedPositions=[]
             for position in Positions:
                 if High>position["Target"]:
                     sellprice=position["Target"]-position["Target"]*discountpercent
-                    ammount=SellStock(ammount, sellprice, i, position, TradesList, df,reason="Target")
+                    ammount=SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="Target")
                 elif Low < position["StopLoss"]:
                     sellprice = position["StopLoss"] - position["StopLoss"] * discountpercent
-                    ammount=SellStock(ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
+                    ammount=SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
                 else:
                     remaniedPositions.append(position)
             Positions=remaniedPositions
-        signal, side, currentPrice, stoploss, Target = MakePrediciton(pastData)
-        if ammount>df["Close"].values[i-1]:
-            if signal and side=="BUY" and len(Positions)==0:
-                if today["Open"]<Target-(Target-currentPrice)/2 and today["Open"]>currentPrice:
-                    buyprice=today["Open"]+today["Open"]*discountpercent
-                    quantity=ammount//buyprice
-                    if quantity>0 and ammount>quantity*buyprice:
-                        Positions.append({"Quantity":quantity,"BuyPrice":buyprice,"Target":Target,"StopLoss":stoploss,"Buy Date":df.index[i]})
-                        ammount-=quantity*buyprice-getBrokrage(quantity*buyprice)
+        signal, side, lastClosePrice, stoploss, Target = MakePrediciton(pastData)
+        if signal:logger.debug(f"Side {side} Date {todatedate} CurrentPrice {lastClosePrice:.2f} Amount {ammount}, Position Count {len(Positions)}")
+        if ammount>df["Close"].values[i-1] and signal and side=="BUY" and len(Positions)==0:
+            if today["Open"]<Target-(Target-lastClosePrice)/2 and today["Open"]>lastClosePrice*((100-CONFIG.MAXGAPDOWNBYPERCENTAGE)/100):
+                buyprice=today["Open"]+today["Open"]*discountpercent
+                quantity=ammount//buyprice
+                if quantity>0 and ammount>quantity*buyprice:
+                    logger.debug("*#^@"*25)
+                    logger.debug(f"Buying at Date {todatedate}, Price {buyprice} and quantity {quantity}")
+                    Positions.append({"Quantity":quantity,"BuyPrice":buyprice,"Target":Target,"StopLoss":stoploss,"BuyDate":df.index[i]})
+                    ammount-=quantity*buyprice-getBrokrage(quantity*buyprice)
+                else:
+                    logger.debug(f"{ammount} {quantity} {buyprice}")
+            else:
+                if today["Open"]>Target-(Target-lastClosePrice)/2:
+                    logger.debug("Not Buying Because Gap Up opening at {:.2f}".format(lastClosePrice))
+                else:
+                    logger.debug("Not Buying Because Gap Down Opening at {:.2f}".format(lastClosePrice))
+        elif signal and side=="BUY":
+            if ammount<=df["Close"].values[i-1]: logger.debug(f"Not Buying because Not enough Money")
         elif signal and side == "SELL" and len(Positions)>0:
-            sellprice=today["Opend"]*0.9999
-            ammount = SellStock(ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
-        LatestPrice=df["Close"].values[-1]
+            sellprice=today["Open"]*0.9999
+            for position in Positions: # Sell All Positions
+                ammount = SellStock(Key,ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
+            Positions=[]
+        if DEBUGEVERY: time.sleep(.1)
+    LatestPrice=df["Close"].values[-1]
     for position in Positions:
         sellprice = LatestPrice - LatestPrice * discountpercent
-        ammount = SellStock(ammount, sellprice, i, position, TradesList, df,reason="InHand")
-    return position,ammount,TradesList,LatestPrice
+        ammount = SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="InHand")
+    return ammount,TradesList,LatestPrice
 
 
-def TrailingStopLosssFixTargetTesting(df,ammount=10000,startindays=100,discountpercent=.002,trailtriggerpercent=5,printFlag=False):
+def TrailingStopLosssFixTargetTesting(Key,df,ammount=10000,startindays=100,discountpercent=.002,trailtriggerpercent=5,printFlag=False):
+    """
+    method is TSL&T
+    :param df:  Datamframe on which you want to Test
+    :param ammount: ammount to spend
+    :param startindays:
+    :param discountpercent:
+    :return:
+    """
+
     TradesList,Positions = [],[]
     if df.shape[0]<startindays-10: return
     for i in range(startindays,df.shape[0]):
@@ -79,11 +131,11 @@ def TrailingStopLosssFixTargetTesting(df,ammount=10000,startindays=100,discountp
                 if High>position["Target"]:
                     sellprice=position["Target"]-position["Target"]*discountpercent
                     if printFlag:print("Target Hitt",Close,position)
-                    ammount=SellStock(ammount, sellprice, i, position, TradesList, df,reason="Target")
+                    ammount=SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="Target")
                 elif Low < position["StopLoss"]:
                     sellprice = position["StopLoss"] - position["StopLoss"] * discountpercent
                     if printFlag:print("Stoploss Hitt",Close,position)
-                    ammount=SellStock(ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
+                    ammount=SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
                 else:
                     buyprice=position["BuyPrice1"] if "BuyPrice1" in position else position["BuyPrice"]
                     tailtargetprices=buyprice+buyprice*trailtriggerpercent/100
@@ -107,15 +159,24 @@ def TrailingStopLosssFixTargetTesting(df,ammount=10000,startindays=100,discountp
                         ammount-=quantity*buyprice-getBrokrage(quantity*buyprice)
         elif signal and side == "SELL" and len(Positions) > 0:
             sellprice = today["Open"] * 0.9999
-            ammount = SellStock(ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
+            ammount = SellStock(Key,ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
     LatestPrice=df["Close"].values[-1]
     for position in Positions:
         sellprice = LatestPrice - LatestPrice * discountpercent
-        ammount = SellStock(ammount, sellprice, i, position, TradesList, df,reason="InHand")
-    return Positions,ammount,TradesList,LatestPrice
+        ammount = SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="InHand")
+    return ammount,TradesList,LatestPrice
 
 
-def TrailingStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.002,trailtriggerpercent=5,printFlag=False):
+def TrailingStopLosssTesting(Key,df,ammount=10000,startindays=100,discountpercent=.002,trailtriggerpercent=5,printFlag=False):
+    """
+    method is TSL
+    :param df:  Datamframe on which you want to Test
+    :param ammount: ammount to spend
+    :param startindays:
+    :param discountpercent:
+    :return:
+    """
+
     TradesList,Positions = [],[]
     if df.shape[0]<startindays-10: return
     for i in range(startindays,df.shape[0]):
@@ -127,7 +188,7 @@ def TrailingStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.0
                 if Low < position["StopLoss"]:
                     sellprice = position["StopLoss"] - position["StopLoss"] * discountpercent
                     if printFlag:print("Stoploss Hitt",Close,position)
-                    ammount=SellStock(ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
+                    ammount=SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
                 else:
                     buyprice=position["BuyPrice1"] if "BuyPrice1" in position else position["BuyPrice"]
                     tailtargetprices=buyprice+buyprice*trailtriggerpercent/100
@@ -150,13 +211,13 @@ def TrailingStopLosssTesting(df,ammount=10000,startindays=100,discountpercent=.0
                         Positions.append({"Quantity":quantity,"BuyPrice":buyprice,"Target":Target,"StopLoss":stoploss,"Buy Date":df.index[i]})
                         ammount-=quantity*buyprice-getBrokrage(quantity*buyprice)
         elif signal and side == "SELL" and len(Positions) > 0:
-            sellprice = today["Opend"] * 0.9999
-            ammount = SellStock(ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
+            sellprice = today["Open"] * 0.9999
+            ammount = SellStock(Key,ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
     LatestPrice=df["Close"].values[-1]
     for position in Positions:
         sellprice = LatestPrice - LatestPrice * discountpercent
-        ammount = SellStock(ammount, sellprice, i, position, TradesList, df,reason="InHand")
-    return position,ammount,TradesList,LatestPrice
+        ammount = SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="InHand")
+    return ammount,TradesList,LatestPrice
 
 
 def ArrangeLongTermResults(baseammount,longtermgain,results={}):
@@ -169,9 +230,9 @@ def ArrangeLongTermResults(baseammount,longtermgain,results={}):
     return results,longtermResults
 
 
-def ArangeTraidingResults(key,df,baseammount,longtermgain, ammount,TradesList,LatestPrice,results,longtermResults,printResults=False):
-    profitTrades=len([t for t in TradesList if t["Reason"]=="Target"])
-    lossTrades=len([t for t in TradesList if t["Reason"]=="StopLoss"])
+def ArangeTraidingResults(key,method,df,baseammount,longtermgain, ammount,TradesList,LatestPrice,results,longtermResults,printResults=False):
+    profitTrades=len([t for t in TradesList if t["BuyPrice"]<t["SelPrice"]])
+    lossTrades=len([t for t in TradesList if t["BuyPrice"]>=t["SelPrice"]])
     StockInHand=sum([t["Quantity"] for t in TradesList if t["Reason"]=="InHand"])
     results.update({"key":key,"profitTrades":profitTrades,"lossTrades":lossTrades,"StockInHand":StockInHand,"LatestPrice":LatestPrice})
     if printResults:
@@ -191,21 +252,42 @@ def ArangeTraidingResults(key,df,baseammount,longtermgain, ammount,TradesList,La
         print(resp)
     return results
 
+def saveTrades(TradesList,method,key):
+    os.makedirs(f"Results/{method}",exist_ok=True)
+    df=pd.DataFrame(TradesList)
+    df["Profit"]=df["BuyPrice"]<df["SelPrice"]
+    df.to_csv(f"Results/{method}/{key}.csv",index=None)
 
-def DobackTesting(df,key="",ammount=10000,startindays=100,discountpercent=.002,method="SL&T",printResults=False):
+
+def DobackTesting(df,Key="",ammount=10000,startindays=100,discountpercent=.002,method="SL&T",printResults=False):
+    if CONFIG.STARTDATE is not None and CONFIG.ENDDATE is not None:
+        logger.info(f"Doing BackTesting from {CONFIG.STARTDATE} to {CONFIG.ENDDATE}")
+        startDate,endDate=datetime.datetime.strptime(CONFIG.STARTDATE,"%Y-%m-%d"),datetime.datetime.strptime(CONFIG.ENDDATE,"%Y-%m-%d")
+        df=df[startDate:endDate+datetime.timedelta(days=1)]
+    elif CONFIG.STARTDATE is not None:
+        logger.info(f"Doing BackTesting from {CONFIG.STARTDATE}")
+        startDate=datetime.datetime.strptime(CONFIG.STARTDATE,"%Y-%m-%d")
+        df=df[startDate:]
+    elif CONFIG.STARTDATE is not None:
+        logger.info(f"Doing BackTesting from Start To {CONFIG.ENDDATE}")
+        endDate=datetime.datetime.strptime(CONFIG.ENDDATE,"%Y-%m-%d")
+        df=df[:endDate+datetime.timedelta(days=1)]
+
+
     baseammount=ammount
     if method=="TSL&T":
-        position,ammount,TradesList,LatestPrice=TrailingStopLosssFixTargetTesting(df,ammount=ammount,startindays=startindays,discountpercent=discountpercent,printFlag=False)
+        ammount,TradesList,LatestPrice=TrailingStopLosssFixTargetTesting(Key,df,ammount=ammount,startindays=startindays,discountpercent=discountpercent,printFlag=False)
     elif method == "TSL":
-        position, ammount, TradesList, LatestPrice = TrailingStopLosssFixTargetTesting(df, ammount=ammount,
+        ammount, TradesList, LatestPrice = TrailingStopLosssTesting(Key,df, ammount=ammount,
                                                                                        startindays=startindays,
                                                                                        discountpercent=discountpercent,
                                                                                        printFlag=False)
     else:
-        position,ammount,TradesList,LatestPrice=TargetStopLosssTesting(df,ammount=ammount,startindays=startindays,discountpercent=discountpercent)
+        ammount,TradesList,LatestPrice=TargetStopLosssTesting(Key,df,ammount=ammount,startindays=startindays,discountpercent=discountpercent)
     longtermgain=calculateInvestmentGain(df, ammount, startindays)
     results,longtermResults=ArrangeLongTermResults(baseammount, longtermgain)
-    results=ArangeTraidingResults(key,df, baseammount, longtermgain, ammount, TradesList, LatestPrice,results,longtermResults, printResults)
+    saveTrades(TradesList, method, Key)
+    results=ArangeTraidingResults(Key,method,df, baseammount, longtermgain, ammount, TradesList, LatestPrice,results,longtermResults, printResults)
     return results
 
 
@@ -235,7 +317,7 @@ def FurtherAnalaysis(df):
         if TraidingProfit>longtermgain:
             print(f"Well Done you earn {TraidingProfit/longtermgain*100:.2f}% better in Traiding")
         else:
-            print(f"Long Term Gain is {longtermgain/TraidingProfit*100:.2}% better then Traiding Stay Invested")
+            print(f"Long Term Gain is {longtermgain/TraidingProfit*100:.2f}% better then Traiding Stay Invested")
     else:
         print(f"You are in loss with Traiding stay with Investment")
 
@@ -246,12 +328,15 @@ def AllStockMultProcessing(type="ALL",method="SL&T"):
     if type=="ALL":
         keys=stockdict.keys()
         stockdictlist=[stockdict for k in stockdict.keys()]
+    elif type=="SELECTED":
+        keys = ["HDFCBANK","CIPLA"]
+        stockdictlist = [stockdict for k in keys]
     else:
         with open("StockData/Indexices.pk","rb") as f:
             keys=pk.load(f)[type]
             stockdictlist=[stockdict for k in keys]
     st=time.time()
-    with concurrent.futures.ProcessPoolExecutor(max_workers=16) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
         # Submit the tasks and collect results
         results = list(executor.map(ProcessStock, stockdictlist,keys,itertools.repeat(method)))
     df=pd.DataFrame(results)
@@ -261,13 +346,13 @@ def AllStockMultProcessing(type="ALL",method="SL&T"):
     print("Total Time Taken ",time.time()-st,"Results Save at",f"Results/Results{method}.csv")
 
 if __name__ == '__main__':
-
     # AllStock()
     stype="Nifty50"
-    # method="SL&T"
+    # stype="SELECTED"
+    method="SL&T"
     # method="TSL&T"
-    method="TSL"
-    # AllStockMultProcessing(stype,method=method)
+    # method="TSL"
+    AllStockMultProcessing(stype,method=method)
     FurtherAnalaysis(pd.read_csv(f"Results/Results{method}.csv"))
     # SingleStock()
 
