@@ -4,13 +4,15 @@ import pandas as pd
 from PlotCode.PlotCandles import PlotChart, PlotMACDForTrade, PlotTrend, PlotMACD, PlotCandles
 
 from DataProcessing.DataLoad import getData
-from Prediction.MYTrendDetection import FindMyTrend
+# from Prediction.MYTrendDetection1 import FindMyTrend
+from Prediction.MYTrendDetection import FindMyTrend  # Best Till now
 
 
 
 def findTrend(pastData, n=10, lastNDays=2):
 	# return findpytrend(pastData, n=n, lastNDays=lastNDays)
-	return FindMyTrend(pastData, min_days=10, max_reversal_pct=0.02,n=n, lastNDays=lastNDays)
+	# return FindMyTrend(pastData, min_days=10, max_reversal_pct=0.02,n=n, lastNDays=lastNDays)
+	return FindMyTrend(pastData,min_days=5,window=21, lastNDays=lastNDays,isPloting=True)
 
 
 def CheckTrend(df,lastDate,n=10,lastNDays=2):

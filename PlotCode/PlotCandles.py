@@ -47,8 +47,13 @@ def PlotCandles(df,figratio=(30, 8),Trend=None,xrotation=45,nbins=30,addIndicato
 		return fig, (ax_candle, ax_volumn)
 
 
-def PlotChart(df,Trend=None,TrendBox=None):
+def PlotChart(df,Trend=None,TrendBox=None,LineS=None):
 	fig, (ax_candle,ax_volumn)=PlotCandles(df,figratio=(30, 8),Trend=Trend)
+
+	if LineS is not None:
+		for line in LineS:
+			ax_candle.axhline(y=line, color='red', linestyle='--', linewidth=1.5)
+
 
 	if TrendBox is not None :
 		print(TrendBox)
@@ -78,7 +83,7 @@ def PlotChart(df,Trend=None,TrendBox=None):
 	mpf.show()
 
 
-def PlotTrend(findTrend,df,windowlenght=100,n=10,lastNDays=2):
+def PlotTrend(findTrend,df,windowlenght=100,n=10,lastNDays=2,minmumMovepercent=15):
 	if df.shape[0] < windowlenght - 10: return
 	j=1
 	for i in range(windowlenght, df.shape[0]):
@@ -86,16 +91,19 @@ def PlotTrend(findTrend,df,windowlenght=100,n=10,lastNDays=2):
 		Trend,TrendStart, TrnedEnd=findTrend(pastData,n=n,lastNDays=lastNDays)
 		if Trend==None: continue
 		TrenDf=pastData[(pastData.index>=TrendStart) &(pastData.index<=TrnedEnd)]
-		if Trend == "Down":
-			startprice, endprice = TrenDf.loc[TrenDf.index[0], "High"], TrenDf.loc[TrenDf.index[-1], "Low"]
-		else:
-			startprice, endprice = TrenDf.loc[TrenDf.index[0], "Low"], TrenDf.loc[TrenDf.index[-1], "High"]
+		startprice, endprice = TrenDf.loc[TrenDf.index[0], "Close"], TrenDf.loc[TrenDf.index[-1], "Close"]
+		# if Trend == "Down":
+		# 	startprice, endprice = TrenDf.loc[TrenDf.index[0], "High"], TrenDf.loc[TrenDf.index[-1], "Low"]
+		# else:
+		# 	startprice, endprice = TrenDf.loc[TrenDf.index[0], "Low"], TrenDf.loc[TrenDf.index[-1], "High"]
+		movepercent=abs(startprice-endprice)/startprice*100
+		if movepercent<minmumMovepercent:continue
 		ChartStart, ChartEnd = pastData.index[0], pastData.index[-1]
-		print(TrenDf)
+		# print(TrenDf)
 		print(f"Chart Start {ChartStart} Chart End {ChartEnd}")
 		print(f"Trend Start {TrendStart} Trend End {TrnedEnd}")
-		StockText=f"From {startprice:.2f} to {endprice:.2f} ({abs(startprice-endprice)/startprice*100:.2}%)"
-		print(j,Trend,f"Stock Move From {startprice:.2f} to {endprice:.2f} That is {abs(startprice-endprice)/startprice*100:.2}%")
+		StockText=f"From {startprice:.2f} to {endprice:.2f} ({abs(startprice-endprice)/startprice*100:.2f}%)"
+		print(j,Trend,f"Stock Move From {startprice:.2f} to {endprice:.2f} That is {movepercent:.2}%")
 		PlotChart(pastData, f"{Trend} from {TrendStart}--->{TrnedEnd} {StockText}",(TrendStart,TrnedEnd))
 		j+=1
 		# exit()
@@ -150,3 +158,12 @@ def PlotMACDForTrade(df,position,Key=None,n=10,fastperiod=12,slowperiod=26,signa
 	                 linewidth=1, edgecolor='red', facecolor='yellow', alpha=0.3)  # Rectangle style
 	ax_candle.add_patch(rect)
 	mpf.show()
+
+
+def PlotSupportAndRessitent(findSupportAndRessut,df,windowlenght=100):
+	if df.shape[0] < windowlenght - 10: return
+	for i in range(windowlenght, df.shape[0]):
+		pastData = df[i-windowlenght:i]
+		supportRessitent=findSupportAndRessut(pastData)
+		if len(supportRessitent)==0: continue
+		PlotChart(pastData,  LineS=supportRessitent)

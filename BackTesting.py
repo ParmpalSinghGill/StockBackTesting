@@ -358,6 +358,6 @@ if __name__ == '__main__':
     # method="TSL&T"
     # method="TSL"
     AllStockMultProcessing(stype,method=method)
-    FurtherAnalaysis(pd.read_csv(f"Results/Results{method}.csv"))
+    # FurtherAnalaysis(pd.read_csv(f"Results/Results{method}.csv"))
     # SingleStock("MARUTI")
 
