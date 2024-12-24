@@ -47,7 +47,7 @@ def PlotCandles(df,figratio=(30, 8),Trend=None,xrotation=45,nbins=30,addIndicato
 		return fig, (ax_candle, ax_volumn)
 
 
-def PlotChart(df,Trend=None,TrendBox=None,LineS=None):
+def PlotChart(df,Trend=None,TrendBox=None,LineS=None,Bars=None):
 	fig, (ax_candle,ax_volumn)=PlotCandles(df,figratio=(30, 8),Trend=Trend)
 
 	if LineS is not None:
@@ -56,7 +56,6 @@ def PlotChart(df,Trend=None,TrendBox=None,LineS=None):
 
 
 	if TrendBox is not None :
-		print(TrendBox)
 		TrendStart , TrnedEnd=TrendBox
 		highlight_start_mdate = mdates.date2num(pd.to_datetime(TrendStart))
 		highlight_end_mdate = mdates.date2num(pd.to_datetime(TrnedEnd))
@@ -72,6 +71,24 @@ def PlotChart(df,Trend=None,TrendBox=None,LineS=None):
 
 		# Add the rectangle to the plot
 		ax_candle.add_patch(rect)
+
+	if Bars is not None :
+		for bar in Bars:
+			high_price,low_price=bar
+			TrendStart , TrnedEnd=df.index[0],df.index[-1]
+			print(bar,high_price,low_price)
+			print(TrendStart,TrnedEnd)
+			highlight_start_mdate = mdates.date2num(pd.to_datetime(TrendStart))
+			highlight_end_mdate = mdates.date2num(pd.to_datetime(TrnedEnd))
+			# Create a rectangle box over the selected date range
+			rect = Rectangle((highlight_start_mdate, low_price),  # (x, y) lower-left corner
+			                 highlight_end_mdate - highlight_start_mdate,  # width (difference in date)
+			                 high_price - low_price,  # height (difference in price)
+			                 linewidth=1, edgecolor='red', facecolor='yellow', alpha=0.3)  # Rectangle style
+			# Add the rectangle to the plot
+			ax_candle.add_patch(rect)
+
+
 
 	# Set date format and frequency of the labels
 	ax_candle.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))  # Show labels every week
@@ -160,10 +177,15 @@ def PlotMACDForTrade(df,position,Key=None,n=10,fastperiod=12,slowperiod=26,signa
 	mpf.show()
 
 
-def PlotSupportAndRessitent(findSupportAndRessut,df,windowlenght=100):
+def PlotSupportAndRessitent(findSupportAndRessut,df,info=None):
+	supportRessitent = findSupportAndRessut(df)
+	if len(supportRessitent) == 0: return
+	PlotChart(df, LineS=supportRessitent, Trend=info)
+
+
+def PlotSupportAndRessitentForHistory(findSupportAndRessut,df,windowlenght=100,info=None):
 	if df.shape[0] < windowlenght - 10: return
 	for i in range(windowlenght, df.shape[0]):
 		pastData = df[i-windowlenght:i]
-		supportRessitent=findSupportAndRessut(pastData)
-		if len(supportRessitent)==0: continue
-		PlotChart(pastData,  LineS=supportRessitent)
+		PlotSupportAndRessitent(findSupportAndRessut, pastData, info=None)
+

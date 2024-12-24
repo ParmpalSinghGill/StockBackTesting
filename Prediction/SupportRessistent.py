@@ -2,7 +2,7 @@ from enum import Enum, auto
 import numpy as np,os
 import numpy as np
 import pandas as pd
-from DataProcessing.DataLoad import getData
+from DataProcessing.DataLoad import getData, getMyStocks
 from PlotCode.PlotCandles import PlotSupportAndRessitent
 import numpy as np
 
@@ -46,10 +46,20 @@ class Sup_Res_Finder():
         return levels
 
 
+def getAllSupportRessitent():
+    mystocks=getMyStocks()
+    pl=Sup_Res_Finder(N=3)
+    for key in mystocks:
+        print("Processing",key)
+        data = getData(key)
+        PlotSupportAndRessitent(pl.find_levels,data[-200:],info="S&R "+key)
+
 
 if __name__ == '__main__':
     os.chdir("../")
-    pl=Sup_Res_Finder(N=2)
-    data = getData("HDFCBANK")
-    PlotSupportAndRessitent(pl.find_levels,data[-1000:],windowlenght=300)
+    pl=Sup_Res_Finder(N=3)
+    # data = getData("HDFCBANK")
+    data = getData("SIEMENS")[:-1]
+    PlotSupportAndRessitent(pl.find_levels,data[-300:])
     # print(pl.find_levels(data.iloc[-200:]))
+    # getAllSupportRessitent()
