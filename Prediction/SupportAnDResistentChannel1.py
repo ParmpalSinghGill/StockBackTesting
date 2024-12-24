@@ -1,25 +1,15 @@
 import os,datetime
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
-from datetime import timedelta
+from PlotCode.PlotCandles import PlotChart
 
 os.chdir("../")
 from DataProcessing.DataLoad import getData
-# data=getData("SBILIFE")
-data=getData("HDFCBANK")
-data["time"]=pd.to_datetime(data.index)
-print(data.shape)
-data.columns=['open', 'high', 'low', 'close', 'Adj Close', 'Volume', 'time']
-# DateAfter=datetime.datetime.strptime("22-10-15","%y-%m-%d")
-# data=data[data.index>=DateAfter]
-print(data.shape)
 
 # Input Parameters
 timeframe = 'D'  # Higher Time Frame
 prd = 10  # Pivot Period
-loopback = 290  # Loopback Period
+loopback = 290 #290  # Loopback Period
 channel_width_pct = 6  # Maximum Channel Width (%)
 min_strength = 1  # Minimum Strength
 max_num_sr = 6  # Maximum Number of S/R to Show
@@ -34,7 +24,34 @@ class SRChannels:
         self.loopback = loopback
         self.pivot_vals = []
         self.pivot_locs = []
+        self.calculationDays=300
         self.support_resistance = [[0, 0] for _ in range(20)]
+
+
+    def ForwarFillPivots(self, pivot_high, pivot_low):
+        # pivot_high, pivot_low=pivot_high[-10*self.period:], pivot_low[-10*self.period:]
+        # selectedsires,selectedval="ph",0
+        # phlList=[]
+        # for ph,pl in zip(pivot_high.values[:],pivot_low.values):
+        #     if ph>pl: selectedsires,selectedval="ph",ph
+        #     elif pl > ph: selectedsires, selectedval = "pl", pl
+        #     if selectedsires=="ph":
+        #         phlList.append([0,selectedval])
+        #     else:
+        #         phlList.append([selectedval,0])
+        # pivotdf=pd.DataFrame(phlList[:-self.period],columns=["pivot_low","pivot_high"],index=pivot_high.index[self.period:])
+        # return pivotdf.iloc[pivotdf.shape[0]-1]
+        # pivot_high,pivot_low=pivot_high.iloc[:-self.period],pivot_low.iloc[:-self.period]
+        # pivot = pivot_high.where(pivot_high != 0, pivot_low)
+        # pivotffils=pivot.replace(0, np.nan).ffill()
+        # return pivotffils.iloc[-1],pivot.iloc[-1]>0
+        pivot_high,pivot_low=pivot_high.iloc[:-self.period+1],pivot_low.iloc[:-self.period+1]
+        pivot = pivot_high.where(pivot_high != 0, pivot_low)
+        pivot=pivot.reset_index(drop=True)
+        pivot=pivot[pivot>0]
+        pivotebeforlopback=pivot[pivot.index > (pivot.index[-1] - self.loopback+1)].values[::-1]
+        seen = set()
+        return [x for x in pivotebeforlopback if not (x in seen or seen.add(x))]
 
     def calculate_pivot_points(self, high, low, close, open_):
         src1 = high if self.source == 'High/Low' else np.maximum(close, open_)
@@ -43,132 +60,95 @@ class SRChannels:
         pivot_low = (src2 == src2.rolling(self.period * 2 + 1, center=True).min()).astype(float)
         pivot_high = src1 * pivot_high
         pivot_low = src2 * pivot_low
-        return pivot_high, pivot_low
+        return self.ForwarFillPivots(pivot_high, pivot_low)
 
-    def get_sr_vals(self, ind):
-        lo = self.pivot_vals[ind]
+    def get_SR_vals(self, lo, pivot_vals):
         hi = lo
         num_pp = 0
-
-        for cpp in self.pivot_vals:
-            width = abs(cpp - lo) if cpp <= hi else abs(hi - cpp)
+        for cpp in pivot_vals:
+            width = abs(hi - cpp) if cpp <= hi else abs(cpp - lo)
             if width <= self.channel_width:
                 lo = min(lo, cpp)
                 hi = max(hi, cpp)
-                num_pp += 20
+                num_pp += self.period*2
+        for y in range(self.loopback):
+            row=self.df.iloc[-y-1]
+            if (row["High"] <= hi and row["High"] >= lo) or (row["Low"] <= hi and row["Low"] >= lo):
+                num_pp += 1
+        return [num_pp,hi, lo]
 
-        return hi, lo, num_pp
+    def changeit(self,x, y, suportresistance):
+        # Get and swap  pair of elements
+        tmp = suportresistance[y]
+        suportresistance[y] = suportresistance[x]
+        suportresistance[x] = tmp
 
-    # def process_pivots(self, ph,pl):
-    #     if any(ph>0) or any(pl>0):  # If there is a pivot high (ph) or pivot low (pl)
-    #         self.pivot_vals=[ for h,l in zip(h,l)]
-            # self.pivotvals.insert(0, ph if ph else pl)  # Add the pivot value (ph or pl) at the beginning of the list
-            # self.pivotlocs.insert(0, range(self.df.shape[0]))  # Add the current bar_index at the beginning of the list
-            #
-            # # Loop through the pivotvals and pivotlocs in reverse order
-            # for x in range(len(pivotvals) - 1, -1, -1):
-            #     # Check if the distance between the current bar and the pivot point is greater than the loopback
-            #     if bar_index - pivotlocs[x] > loopback:
-            #         pivotvals.pop()  # Remove the oldest pivot value
-            #         pivotlocs.pop()  # Remove the corresponding pivot location
-            #         continue  # Move to the next pivot
-            #     break  # Stop the loop when the condition is not met
-            #
-    # def process_pivots(self, high, low, close, bar_index):
-    #     for ph, pl in zip(high, low):
-    #         if ph or pl:
-    #             pivot = ph if ph else pl
-    #             self.pivot_vals.insert(0, pivot)
-    #             self.pivot_locs.insert(0, bar_index)
-    #
-    #             while len(self.pivot_vals) > 0 and bar_index - self.pivot_locs[-1] > self.loopback:
-    #                 self.pivot_vals.pop()
-    #                 self.pivot_locs.pop()
 
-    def update_support_resistance(self, high, low, close):
-        supres = []
-        strengths = [0] * 10
+    def getStrongSupportAndRessitent(self,pivotvals,supres):
+        supportandRessitent,stren=[],[]
+        src = 0
+        for x in pivotvals:
+            stv=-1
+            stl=-1
+            revspr=supres[::-1]
+            for y,sup in enumerate(revspr):
+                if sup[0]>stv and sup[0]>=self.min_strength*self.period*2:
+                    stv,stl=sup[0],y
+            if stl >= 0:
+                # get sr level
+                hh = revspr[stl][1]
+                ll = revspr[stl][2]
+                supportandRessitent.append([hh,ll])
+                stren.append(revspr[stl][0])
 
-        for ind, _ in enumerate(self.pivot_vals):
-            hi, lo, strength = self.get_sr_vals(ind)
-            supres.append((strength, hi, lo))
+                for sp in supres:
+                    if sp[1]<=hh and sp[1]>=ll or sp[2]<=hh and sp[2]>=ll:
+                        sp[0]=-1
+                src += 1
+                if src >= 10:break
 
-        for ind, (hi, lo, _) in enumerate(supres):
-            s = 0
-            for i in range(self.loopback):
-                if (high[i] <= hi and high[i] >= lo) or (low[i] <= hi and low[i] >= lo):
-                    s += 1
-            supres[ind] = (supres[ind][0] + s, hi, lo)
+        for x in range(len(stren)-1):
+            for y in range(len(stren)):
+                if stren[y] > stren[x]:
+                    stren[y]=stren[x]
+                    self.changeit(x,y,supportandRessitent)
+        return supportandRessitent
 
-        supres.sort(reverse=True, key=lambda x: x[0])
-
-        for i in range(min(self.max_num_sr, len(supres))):
-            _, hi, lo = supres[i]
-            self.support_resistance[i] = [hi, lo]
-
-    def get_channel_colors(self, close):
-        colors = []
-        for hi, lo in self.support_resistance[:self.max_num_sr]:
-            if hi and lo:
-                if close > hi and close > lo:
-                    colors.append("Resistance")
-                elif close < hi and close < lo:
-                    colors.append("Support")
-                else:
-                    colors.append("Inside Channel")
-        return colors
-
-    def check_broken_channels(self, close, close_prev):
-        resistance_broken = False
-        support_broken = False
-
-        for hi, lo in self.support_resistance[:self.max_num_sr]:
-            if hi and lo:
-                if close_prev <= hi < close:
-                    resistance_broken = True
-                if close_prev >= lo > close:
-                    support_broken = True
-
-        return resistance_broken, support_broken
-
-    def getSupportAndRessitent(self,df):
-        self.df=df
+    def getSupportAndRessitent(self,fulldf,nDays=0):
+        self.df=fulldf
+        self.df[-self.calculationDays:]
+        # get Channel width with high low of last year
+        self.channel_width=(self.df.iloc[-300:, self.df.columns.get_loc("High")].max() - self.df.iloc[-300:, self.df.columns.get_loc("Low")].min()) * self.channel_width_percentage / 100
         # Calculate Pivot Points
-        last300=df.iloc[-300:, df.columns.get_loc("close")]
-        self.channel_width=(last300.max() - last300.min()) * self.channel_width_percentage / 100
-        pivot_high, pivot_low = self.calculate_pivot_points(df["high"], df["low"], df["close"], df["open"])
-        print(pivot_high[pivot_high>0])
-        # Process Pivot Points
-        # self.process_pivots(pivot_high, pivot_low)
-        # self.process_pivots(pivot_high, pivot_low, df["close"], np.arange(len(df)))
-        #
-        # # Update Support and Resistance Levels
-        # sr.update_support_resistance(df["high"], df["low"], df["close"])
-        #
-        # # Check Broken Channels
-        # close_prev = df["close"].shift(1).fillna(df["close"][0])
-        # resistance_broken, support_broken = sr.check_broken_channels(df["close"], close_prev)
-        #
-        # # Display Results
-        # print("Support/Resistance Levels:", sr.support_resistance)
-        # print("Resistance Broken:", resistance_broken)
-        # print("Support Broken:", support_broken)
+        pivotvals = self.calculate_pivot_points(self.df["High"], self.df["Low"], self.df["Close"], self.df["Open"])
+        # print([f"{p:.2f}" for p in  pivotvals])
+        sandr=[self.get_SR_vals(x, pivotvals) for x in pivotvals]
+        print(sandr)
+        # print(self.get_SR_vals(pivotvals[2], pivotvals))
+        supres=self.getStrongSupportAndRessitent(pivotvals,sandr)
+        return supres
+
 
 
 # Example Usage
 def main():
-    # # Sample Data
-    # data = {
-    #     "open": [1, 1.1, 1.2, 1.3, 1.4, 1.5],
-    #     "high": [1.2, 1.3, 1.4, 1.5, 1.6, 1.7],
-    #     "low": [0.9, 1.0, 1.1, 1.2, 1.3, 1.4],
-    #     "close": [1.1, 1.2, 1.3, 1.4, 1.5, 1.6],
-    # }
-    # df = pd.DataFrame(data)'
-    df=data
+    # data=getData("SBILIFE")
+    data = getData("HDFCBANK")
+    # data = getData("HYUNDAI")
+    # data["time"] = pd.to_datetime(data.index)
+    # data.columns = ['open', 'high', 'low', 'close', 'Adj Close', 'Volume', 'time']
+    # DateAfter=datetime.datetime.strptime("22-10-15","%y-%m-%d")
+    # data=data[data.index>=DateAfter]
+    print(data.shape)
 
-    sr = SRChannels()
-    sr.getSupportAndRessitent(df)
+    df=data
+    sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback)
+    spandr=sr.getSupportAndRessitent(df)
+    print(spandr)
+    # print(sorted(spandr,key=lambda x:x[0],reverse=True))
+    # spandr=list(filter(lambda x:x[0]!=x[1],spandr))
+    # print(sorted(spandr,key=lambda x:x[0],reverse=True))
+    # PlotChart(df[-200:],Trend="S&R",Bars=spandr)
 
 if __name__ == "__main__":
     main()
