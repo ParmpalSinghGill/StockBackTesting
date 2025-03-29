@@ -14,7 +14,7 @@ import pickle
 import requests
 import time
 import joblib
-import keras
+# import keras
 import pandas as pd
 from alive_progress import alive_bar
 from tabulate import tabulate
@@ -107,7 +107,7 @@ class tools:
         if weekday == 5 or weekday == 6:  # for saturday and sunday
             cache_date = datetime.datetime.today() - datetime.timedelta(days=weekday - 4)
         cache_date = cache_date.strftime("%d%m%y")
-        cache_file = "stock_data_" + str(cache_date) + ".pkl"
+        cache_file = ConfigManager.StopFolder+"stock_data_" + str(cache_date) + ".pkl"
         configManager.deleteStockData(excludeFile=cache_file)
 
         if not os.path.exists(cache_file) or len(stockDict) > (loadCount+1):
@@ -120,8 +120,7 @@ class tools:
                     print(colorText.BOLD + colorText.FAIL +
                           "=> Error while Caching Stock Data." + colorText.END)
         else:
-            print(colorText.BOLD + colorText.GREEN +
-                  "=> Already Cached." + colorText.END)
+            print(colorText.BOLD + colorText.GREEN +"=> Already Cached at "+cache_file + colorText.END)
 
     def loadStockData(stockDict, configManager, proxyServer=None):
         curr = datetime.datetime.now(pytz.timezone('Asia/Kolkata'))
@@ -158,7 +157,7 @@ class tools:
                 resp = requests.get(cache_url, stream=True, proxies={'https':proxyServer})
             else:
                 resp = requests.get(cache_url, stream=True)
-            if resp.status_code == 200:
+            if resp.status_code == 205:
                 print(colorText.BOLD + colorText.FAIL +
                       "[+] After-Market Stock Data is not cached.." + colorText.END)
                 print(colorText.BOLD + colorText.GREEN +
@@ -184,6 +183,7 @@ class tools:
             else:
                 # print(colorText.BOLD + colorText.FAIL +"[+] Cache unavailable on Screenipy server, Continuing.." + colorText.END)
                 print(colorText.BOLD + colorText.FAIL +"[+] Cache unavailable on Screenipy server, Continuing.." + colorText.END)
+        return local_cashe_file
 
     # Save screened results to excel
     def promptSaveResults(df):

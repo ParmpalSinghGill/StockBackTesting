@@ -89,7 +89,7 @@ class SRChannels:
 
     def getSupportAndRessitent(self,fulldf,nDays=0):
         self.df=fulldf
-        self.df[-self.calculationDays:]
+        self.df=self.df[-self.calculationDays:]
         # get Channel width with high low of last year
         self.channel_width=(self.df.iloc[-300:, self.df.columns.get_loc("High")].max() - self.df.iloc[-300:, self.df.columns.get_loc("Low")].min()) * self.channel_width_percentage / 100
         # Calculate Pivot Points
@@ -115,8 +115,8 @@ def main():
     max_num_sr = 6  # Maximum Number of S/R to Show
 
     # data=getData("SBILIFE")
-    data=getData("HINDUNILVR")
-    # data = getData("HDFCBANK")
+    # data=getData("HINDUNILVR")
+    data = getData("HDFCBANK")
     # data = getData("HYUNDAI")
     # data["time"] = pd.to_datetime(data.index)
     # data.columns = ['open', 'high', 'low', 'close', 'Adj Close', 'Volume', 'time']
@@ -127,7 +127,8 @@ def main():
     df=data
     sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback)
     spandr=sr.getSupportAndRessitent(df)
-    PlotChart(df[-150:],Trend="S&R",Bars=spandr)
+    # PlotChart(df[-150:],Trend="S&R",Bars=spandr)
+    print(spandr)
 
 if __name__ == "__main__":
     main()

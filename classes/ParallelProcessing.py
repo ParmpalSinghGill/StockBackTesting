@@ -22,7 +22,9 @@ from copy import deepcopy
 from classes.CandlePatterns import CandlePatterns
 from classes.ColorText import colorText
 from classes.SuppressOutput import SuppressOutput
+import pickle as pk
 
+lock = multiprocessing.Lock()
 if sys.platform.startswith('win'):
     import multiprocessing.popen_spawn_win32 as forking
 else:
@@ -52,6 +54,7 @@ class StockConsumer(multiprocessing.Process):
                 except Empty:
                     continue
                 if next_task is None:
+                    print("Next Task ",next_task)
                     self.task_queue.task_done()
                     break
                 answer = self.screenStocks(*(next_task))
@@ -59,6 +62,7 @@ class StockConsumer(multiprocessing.Process):
                 self.result_queue.put(answer)
         # except Exception as e:
         #     sys.exit(0)
+
 
     def screenStocks(self, tickerOption, executeOption, reversalOption, maLength, daysForLowestVolume, minRSI, maxRSI, respChartPattern, insideBarToLookback, totalSymbols,
                      configManager, fetcher, screener:Screener.tools, candlePatterns, stock, newlyListedOnly, downloadOnly, vectorSearch, isDevVersion, backtestDate, printCounter=False):
@@ -91,6 +95,7 @@ class StockConsumer(multiprocessing.Process):
                                                 backtestDate=backtestDate,
                                                 tickerOption=tickerOption)
                 except Exception as e:
+                    print("screenStocks Exception", e)
                     return screeningDictionary, saveDictionary
                 if configManager.cacheEnabled is True and not self.isTradingTime and (self.stockDict.get(stock) is None) or downloadOnly:
                     self.stockDict[stock] = data.to_dict('split')

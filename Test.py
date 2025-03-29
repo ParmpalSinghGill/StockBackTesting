@@ -173,52 +173,170 @@
 # plt.show()
 
 
+# import pandas as pd
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from DataProcessing.DataLoad import getData
+#
+# # Load historical stock data
+# # Replace with your data source or file
+# # Example data should have columns: 'Date', 'Open', 'High', 'Low', 'Close'
+# # data = pd.read_csv("stock_data.csv")
+# data = getData("HDFCBANK")[-200:]
+# data['Date'] = pd.to_datetime(data.index)
+# data.set_index('Date', inplace=True)
+#
+#
+# # Function to find support and resistance
+# def find_support_resistance(data, window=20):
+#     """
+#     Identify support and resistance levels based on rolling window.
+#
+#     Parameters:
+#         data (pd.DataFrame): Historical stock data with 'High' and 'Low' columns.
+#         window (int): Number of periods for local minima/maxima calculation.
+#
+#     Returns:
+#         pd.DataFrame: Dataframe with support and resistance levels.
+#     """
+#     # Identify local minima (support)
+#     data['Support'] = data['Low'][::-1].rolling(window=window, center=True).min()
+#     # Identify local maxima (resistance)
+#     data['Resistance'] = data['High'][::-1].rolling(window=window, center=True).max()
+#
+#     return data
+#
+#
+# # Apply the function
+# window_size = 10  # You can adjust this value based on the chart's granularity
+# data = find_support_resistance(data, window=window_size)
+#
+# # Plot the data
+# plt.figure(figsize=(14, 7))
+# plt.plot(data.index, data['Close'], label='Close Price', color='blue', linewidth=1)
+# plt.plot(data.index, data['Support'], label='Support', color='green', linestyle='--')
+# plt.plot(data.index, data['Resistance'], label='Resistance', color='red', linestyle='--')
+# plt.title('Support and Resistance Levels')
+# plt.xlabel('Date')
+# plt.ylabel('Price')
+# plt.legend()
+# plt.grid()
+# plt.show()
+
+# import pandas as pd
+# import mplfinance as mpf
+# from DataProcessing.DataLoad import getData
+# # # Load stock data from CSV file
+# # # Replace 'your_stock_data.csv' with your file name
+# # # data = pd.read_csv("your_stock_data.csv")
+# data = getData("HDFCBANK")[-365:]
+# print(data.columns)
+# print(data)
+# for d in list(data.index):
+#     print(d)
+
+import requests
+
+url = f'https://eodhd.com/api/news?s=AAPL.US&offset=0&limit=10&api_token=demo&fmt=json'
+data = requests.get(url).json()
+
+for d in data:
+    print(d)
+
+#
+# # Ensure the 'Date' column is in datetime format
+# data['Date'] = pd.to_datetime(data.index)
+# data.set_index('Date', inplace=True)
+#
+#
+# # Calculate support and resistance levels
+# def find_support_resistance(data, window=5):
+#     support = []
+#     resistance = []
+#     for i in range(window, len(data) - window):
+#         high_window = data['High'][i - window:i + window + 1]
+#         low_window = data['Low'][i - window:i + window + 1]
+#
+#         # Check if the current high is the max in the window
+#         if data['High'][i] == high_window.max():
+#             resistance.append((data.index[i], data['High'][i]))
+#
+#         # Check if the current low is the min in the window
+#         if data['Low'][i] == low_window.min():
+#             support.append((data.index[i], data['Low'][i]))
+#
+#     return support, resistance
+#
+#
+# # Adjust the window size based on volatility
+# support_levels, resistance_levels = find_support_resistance(data, window=5)
+#
+# # Convert support/resistance levels to dictionaries for plotting
+# support_lines = {date: price for date, price in support_levels}
+# resistance_lines = {date: price for date, price in resistance_levels}
+#
+# # Plotting the chart with support and resistance levels
+# ap = [
+#     mpf.make_addplot(list(support_lines.values()), scatter=True, markersize=50, marker='^', color='green'),
+#     mpf.make_addplot(list(resistance_lines.values()), scatter=True, markersize=50, marker='v', color='red')
+# ]
+#
+# mpf.plot(data, type='candle', addplot=ap, title="Support & Resistance Levels", volume=True)
+#
+#
+
+import yfinance as yf
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from DataProcessing.DataLoad import getData
-
-# Load historical stock data
-# Replace with your data source or file
-# Example data should have columns: 'Date', 'Open', 'High', 'Low', 'Close'
-# data = pd.read_csv("stock_data.csv")
-data = getData("HDFCBANK")[-200:]
-data['Date'] = pd.to_datetime(data.index)
-data.set_index('Date', inplace=True)
 
 
-# Function to find support and resistance
-def find_support_resistance(data, window=20):
-    """
-    Identify support and resistance levels based on rolling window.
+# def download_stock_data(ticker, start_date, end_date, interval='1d'):
+#     """
+#     Downloads historical stock data from Yahoo Finance.
+#
+#     :param ticker: Stock symbol (e.g., 'AAPL' for Apple Inc.)
+#     :param start_date: Start date in 'YYYY-MM-DD' format
+#     :param end_date: End date in 'YYYY-MM-DD' format
+#     :param interval: Data interval (default is '1d'). Options: '1m', '5m', '1d', '1wk', '1mo'
+#     :return: Pandas DataFrame containing stock data
+#     """
+#     stock = yf.Ticker(ticker)
+#     data = stock.history(start=start_date, end=end_date, interval=interval)
+#     return data
+#
 
-    Parameters:
-        data (pd.DataFrame): Historical stock data with 'High' and 'Low' columns.
-        window (int): Number of periods for local minima/maxima calculation.
+#
+# def download_stock_data(ticker, start_date, end_date, interval='1d'):
+#     data = yf.download(ticker, start=start_date, end=end_date, interval=interval)
+#     return data
+#
+# # Example usage
+# ticker = 'AAPL'  # Apple Inc.
+# start_date = '2025-01-01'
+# end_date = '2025-02-21'
+#
+# data = download_stock_data(ticker, start_date, end_date)
+# print(data.head())
+#
 
-    Returns:
-        pd.DataFrame: Dataframe with support and resistance levels.
-    """
-    # Identify local minima (support)
-    data['Support'] = data['Low'][::-1].rolling(window=window, center=True).min()
-    # Identify local maxima (resistance)
-    data['Resistance'] = data['High'][::-1].rolling(window=window, center=True).max()
+# def getDatFrame(stockData):
+#     try:
+#         return pd.DataFrame(stockData["data"],columns=stockData["columns"],index=stockData["index"])
+#     except Exception as e:
+#         print(stockData)
+#         raise e
+#
+# import pickle as pk
+# #
+# with open("/media/parmpal/Data/Codes/MyCodes/StockS/StockBackTesting/DataProcessing/Stocks/stock_data_210325.pkl","rb") as f:
+#     stockDict=pk.load(f)
+#
+# # # print(data)
+# for k, v in stockDict.items():
+#     df = getDatFrame(v)
+#     print(df.columns)
+# #
+#
+# for k,v in data.items():
+#     print("SSS",k,v)
+#     # exit()
 
-    return data
-
-
-# Apply the function
-window_size = 10  # You can adjust this value based on the chart's granularity
-data = find_support_resistance(data, window=window_size)
-
-# Plot the data
-plt.figure(figsize=(14, 7))
-plt.plot(data.index, data['Close'], label='Close Price', color='blue', linewidth=1)
-plt.plot(data.index, data['Support'], label='Support', color='green', linestyle='--')
-plt.plot(data.index, data['Resistance'], label='Resistance', color='red', linestyle='--')
-plt.title('Support and Resistance Levels')
-plt.xlabel('Date')
-plt.ylabel('Price')
-plt.legend()
-plt.grid()
-plt.show()

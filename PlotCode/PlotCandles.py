@@ -47,9 +47,11 @@ def PlotCandles(df,figratio=(30, 8),Trend=None,xrotation=45,nbins=30,addIndicato
 		return fig, (ax_candle, ax_volumn)
 
 
-def PlotChart(df,Trend=None,TrendBox=None,LineS=None,Bars=None):
+def PlotChart(df,Trend=None,TrendBox=None,LineS=None,Bars=None,addCloseLine=True):
 	fig, (ax_candle,ax_volumn)=PlotCandles(df,figratio=(30, 8),Trend=Trend)
 	lasclose=df["Close"][-1]
+	if addCloseLine:
+		ax_candle.axhline(y=lasclose, color='black', linestyle='-', linewidth=1.5)
 
 	if LineS is not None:
 		for line in LineS:
@@ -76,7 +78,7 @@ def PlotChart(df,Trend=None,TrendBox=None,LineS=None,Bars=None):
 	if Bars is not None :
 		for bar in Bars:
 			high_price,low_price=bar
-			color="gray" if lasclose>high_price else "red" if lasclose<low_price else "lime"
+			color="green" if lasclose>high_price else "red" if lasclose<low_price else "lime"
 			TrendStart , TrnedEnd=df.index[0],df.index[-1]
 			highlight_start_mdate = mdates.date2num(pd.to_datetime(TrendStart))
 			highlight_end_mdate = mdates.date2num(pd.to_datetime(TrnedEnd))
