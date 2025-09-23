@@ -238,7 +238,7 @@ def saveIndexStocks():
 # Main function
 def main():
     # print(fetcher.fetchCodepip install --upgrade yfinances(12))
-    # updateStockData()
+    updateStockData()
     upDateIndex()
 
 
