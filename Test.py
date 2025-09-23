@@ -173,7 +173,7 @@
 # plt.show()
 
 
-# import pandas as pd
+import pandas as pd
 # import numpy as np
 # import matplotlib.pyplot as plt
 # from DataProcessing.DataLoad import getData
@@ -235,13 +235,45 @@
 # for d in list(data.index):
 #     print(d)
 
-import requests
+def AddOLdComudityData():
+    df=pd.read_csv("StockData/INDEXData/Comudities_back.csv")
+    df["Date"]=pd.to_datetime(df["Date"])
+    df=df.set_index("Date")
+    oldData=pd.read_csv("/home/parmpal/Downloads/NIFTY 50_Historical_PR_01011990to31102007.csv")
+    oldData["Date"]=pd.to_datetime(oldData["Date"])
+    oldData=oldData.set_index("Date")
+    for k,v in {"NIFTY50_Close":"Close","NIFTY50_High":"High","NIFTY50_Low":"Low","NIFTY50_Open":"Open"}.items():
+        df[k]=df[k].fillna(oldData[v])
+    oldData=oldData.sort_index()
+    oldData=oldData[oldData.index<df.index[0]]
+    for c in ["Open","Low","High"]:
+        oldData[c] = oldData.apply(lambda row: row['Close'] if row[c] == '-' else row[c], axis=1)
+    oldData=oldData.rename(columns={"Close":"NIFTY50_Close","High":"NIFTY50_High","Low":"NIFTY50_Low","Open":"NIFTY50_Open"})
+    oldData=oldData.drop(columns=["Index Name"])
+    df=pd.concat([oldData,df],axis=0)
+    for col in ['NIFTY50_Open', 'NIFTY50_High', 'NIFTY50_Low', 'NIFTY50_Close']:
+        df[col] = df[col].fillna(df['NIFTY50_Close'].shift())  # fill any remaining with previous close
+    for col in ['gold_Open', 'gold_High', 'gold_Low', 'gold_Close']:
+        df[col] = df[col].fillna(df['gold_Close'].shift())  # fill any remaining with previous close
+    for col in ['crude_Open', 'crude_High', 'crude_Low', 'crude_Close']:
+        df[col] = df[col].fillna(df['crude_Close'].shift())  # fill any remaining with previous close
+    for col in ['NIFTY50_Volume', 'gold_Volume', 'crude_Volume']:
+        df[col] = df[col].fillna(df[col].rolling(window=10, min_periods=1).mean())
+        df[col]=df[col].fillna(0)
+        df[col]=df[col].astype(int)
 
-url = f'https://eodhd.com/api/news?s=AAPL.US&offset=0&limit=10&api_token=demo&fmt=json'
-data = requests.get(url).json()
+    print(df.columns)
+    df.to_csv("StockData/INDEXData/Comudities.csv")
 
-for d in data:
-    print(d)
+
+AddOLdComudityData()
+# import requests
+#
+# url = f'https://eodhd.com/api/news?s=AAPL.US&offset=0&limit=10&api_token=demo&fmt=json'
+# data = requests.get(url).json()
+#
+# for d in data:
+#     print(d)
 
 #
 # # Ensure the 'Date' column is in datetime format

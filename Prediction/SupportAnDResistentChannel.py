@@ -1,9 +1,10 @@
-import os,datetime
+import os,sys,datetime
 import numpy as np
 import pandas as pd
+sys.path.append(".")
 from PlotCode.PlotCandles import PlotChart
 
-os.chdir("../")
+# os.chdir("../")
 from DataProcessing.DataLoad import getData
 
 
@@ -15,7 +16,7 @@ class SRChannels:
         self.min_strength = min_strength
         self.max_num_sr = max_num_sr
         self.loopback = loopback-1
-        self.calculationDays=300
+        self.calculationDays=600
 
 
     def ForwarFillPivots(self, pivot_high, pivot_low):
@@ -114,9 +115,18 @@ def main():
     min_strength = 1  # Minimum Strength
     max_num_sr = 6  # Maximum Number of S/R to Show
 
+    timeframe = 'D'  # Higher Time Frame
+    prd = 10  # Pivot Period
+    loopback = 590  # 290  # Loopback Period
+    channel_width_pct = 6  # Maximum Channel Width (%)
+    min_strength = 1  # Minimum Strength
+    max_num_sr = 6  # Maximum Number of S/R to Show
+
+
     # data=getData("SBILIFE")
     # data=getData("HINDUNILVR")
-    data = getData("HDFCBANK")
+    # data = getData("HDFCBANK")
+    data = getData("TCS")
     # data = getData("HYUNDAI")
     # data["time"] = pd.to_datetime(data.index)
     # data.columns = ['open', 'high', 'low', 'close', 'Adj Close', 'Volume', 'time']
@@ -127,8 +137,8 @@ def main():
     df=data
     sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback)
     spandr=sr.getSupportAndRessitent(df)
-    # PlotChart(df[-150:],Trend="S&R",Bars=spandr)
     print(spandr)
+    PlotChart(df[-150:],Trend="S&R",Bars=spandr)
 
 if __name__ == "__main__":
     main()

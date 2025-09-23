@@ -1,4 +1,4 @@
-import datetime,warnings,talib
+import datetime,warnings #,talib
 warnings.filterwarnings("ignore")
 from matplotlib import pyplot as plt
 import pandas as pd

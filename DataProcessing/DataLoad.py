@@ -28,10 +28,16 @@ def getDatFrame(stockData):
         print(stockData)
         raise e
 
+def readFile(path):
+    try:
+        with open(path, "rb") as f:
+            return  pk.load(f)
+    except FileNotFoundError:
+        with open("../"+path, "rb") as f:
+            return  pk.load(f)
 
 def getData(key=None):
-    with open("StockData/AllSTOCKS.pk", "rb") as f:
-        Fulldata=pk.load(f)
+    Fulldata=readFile("StockData/AllSTOCKS.pk")
     if key is None:
         return Fulldata
     elif key in Fulldata:

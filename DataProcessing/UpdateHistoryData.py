@@ -1,12 +1,19 @@
 #!/usr/bin/python3
 import datetime
-# Pyinstaller compile Windows: pyinstaller --onefile --icon=src\icon.ico src\UpdateData.py  --hidden-import cmath --hidden-import talib.stream --hidden-import numpy --hidden-import pandas --hidden-import alive-progress --hidden-import chromadb
-# Pyinstaller compile Linux  : pyinstaller --onefile --icon=src/icon.ico src/UpdateData.py  --hidden-import cmath --hidden-import talib.stream --hidden-import numpy --hidden-import pandas --hidden-import alive-progress --hidden-import chromadb
+# Pyinstaller compile Windows: pyinstaller --onefile --icon=src\icon.ico src\UpdateHistoryData.py  --hidden-import cmath --hidden-import talib.stream --hidden-import numpy --hidden-import pandas --hidden-import alive-progress --hidden-import chromadb
+# Pyinstaller compile Linux  : pyinstaller --onefile --icon=src/icon.ico src/UpdateHistoryData.py  --hidden-import cmath --hidden-import talib.stream --hidden-import numpy --hidden-import pandas --hidden-import alive-progress --hidden-import chromadb
 
 # Keep module imports prior to classes
-import os
+import yfinance as yf
+import time
+# from yfinance.shared import YFRateLimitError
+import os,sys
 import yfinance as yf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 import classes.Fetcher as Fetcher
 import classes.ConfigManager as ConfigManager
 import classes.Screener as Screener
@@ -91,8 +98,12 @@ def getDatFrame(stockData):
         raise e
 
 
+def _path_from_root(relative_path: str) -> str:
+    return os.path.join(PROJECT_ROOT, relative_path)
+
+
 def UpdateFullStockData(stockDict):
-    with open("../StockData/AllSTOCKS.pk", "rb") as f:
+    with open(_path_from_root("StockData/AllSTOCKS.pk"), "rb") as f:
         FullData=pk.load(f)
     Nodata=0
     for k,v in stockDict.items():
@@ -108,7 +119,7 @@ def UpdateFullStockData(stockDict):
         fuldatadf=getDatFrame(FullData[k])
         fuldatadf=pd.concat([fuldatadf, df[~df.index.isin(fuldatadf.index)]])
         FullData[k]={"data":fuldatadf.values,"columns":fuldatadf.columns,"index":fuldatadf.index}
-    with open("../StockData/AllSTOCKS.pk", "wb") as f:
+    with open(_path_from_root("StockData/AllSTOCKS.pk"), "wb") as f:
         pk.dump(FullData,f)
     print(f"All Stock Updated {Nodata} Stock with no Data  out of {len(FullData)}")
 
@@ -180,8 +191,56 @@ def updateStockData():
     UpdateFullStockData(stockDict)
     return stockDict
 
+def FillMissingComudintes(df):
+    for col in ['NIFTY50_Open', 'NIFTY50_High', 'NIFTY50_Low', 'NIFTY50_Close']:
+        df[col] = df[col].fillna(df['NIFTY50_Close'].shift())  # fill any remaining with previous close
+    for col in ['gold_Open', 'gold_High', 'gold_Low', 'gold_Close']:
+        df[col] = df[col].fillna(df['gold_Close'].shift())  # fill any remaining with previous close
+    for col in ['crude_Open', 'crude_High', 'crude_Low', 'crude_Close']:
+        df[col] = df[col].fillna(df['crude_Close'].shift())  # fill any remaining with previous close
+    for col in ['NIFTY50_Volume', 'gold_Volume', 'crude_Volume']:
+        df[col] = df[col].fillna(df[col].rolling(window=10, min_periods=1).mean())
+        df[col]=df[col].fillna(0)
+        df[col]=df[col].astype(int)
+    return df
 
-def upDateIndex(comudityFIle="../StockData/INDEXData/Comudities.csv"):
+def download_with_retry(ticker, period, interval='1d', proxy=None, max_retries=20, initial_delay=5):
+    """
+    Downloads ticker data with a retry mechanism for rate limit errors.
+    """
+    retries = 0
+    while retries < max_retries:
+        try:
+            print(f"Attempting to download {ticker}... (Attempt {retries + 1}/{max_retries})")
+            data = yf.download(
+                tickers=ticker,
+                period=period,
+                interval=interval,
+                proxy=proxy,
+                progress=False,
+                timeout=30
+            )
+            # Add a small delay between successful downloads to avoid hitting the rate limit
+            time.sleep(1) 
+            return data
+        except Exception as e:
+            delay = initial_delay * (2 ** retries)
+            print(f"Rate limit hit for {ticker}. Retrying in {delay} seconds...")
+            time.sleep(delay)
+            retries += 1
+        # except Exception as e:
+        #     print(f"An unexpected error occurred for {ticker}: {e}")
+        #     break
+            
+    print(f"Failed to download {ticker} after {max_retries} retries.")
+    return None
+
+def upDateIndex(comudityFIle: str | None = None):
+    if comudityFIle is None:
+        comudityFIle = _path_from_root("StockData/INDEXData/Comudities.csv")
+    elif not os.path.isabs(comudityFIle):
+        comudityFIle = _path_from_root(comudityFIle)
+
     if os.path.exists(comudityFIle):
         olddata=pd.read_csv(comudityFIle,index_col=0)
         olddata.index=pd.to_datetime(olddata.index)
@@ -192,38 +251,40 @@ def upDateIndex(comudityFIle="../StockData/INDEXData/Comudities.csv"):
     else:
         olddata=None
         period="max"
-    niftydata = yf.download(
-        tickers="^NSEI",
+
+
+    niftydata = download_with_retry(
+        ticker="^NSEI",
         period=period,
-        interval='1d',
-        proxy=proxyServer,
-        progress=False,
-        timeout=10
-    ).rename(columns={k:"NIFTY50_"+k for k in "Open,High,Low,Close,Adj Close,Volume".split(",")})
-    gold = yf.download(
-        tickers="GC=F",
+        proxy=proxyServer
+    )
+    if niftydata is not None:
+        niftydata = niftydata.rename(columns={k: "NIFTY50_" + k for k in "Open,High,Low,Close,Adj Close,Volume".split(",")})
+
+
+    gold = download_with_retry(
+        ticker="GC=F",
         period=period,
-        interval='1d',
-        proxy=proxyServer,
-        progress=False,
-        timeout=10
-    ).add_prefix(prefix='gold_')
-    print(gold)
-    crude = yf.download(
-        tickers="CL=F",
+        proxy=proxyServer
+    )
+    if gold is not None:
+        gold = gold.add_prefix(prefix='gold_')
+    crude = download_with_retry(
+        ticker="CL=F",
         period=period,
-        interval='1d',
-        proxy=proxyServer,
-        progress=False,
-        timeout=10
-    ).add_prefix(prefix='crude_')
+        proxy=proxyServer
+    )
+    if crude is not None:
+        crude = crude.add_prefix(prefix='crude_')
     # data = pd.concat([niftydata,bankniftydata,sensex, gold, crude], axis=1)
     data = pd.concat([niftydata, gold, crude], axis=1)
+    data.to_csv("Comidity.csv")
     data.columns=data.columns.get_level_values('Price').tolist()
     if olddata is not None:
         data=data[data.index>lastdate]
         data=pd.concat([olddata,data])
     os.makedirs(os.path.dirname(comudityFIle),exist_ok=True)
+    data=FillMissingComudintes(data)
     data.to_csv(comudityFIle)
     print("Updated Commidity to ",comudityFIle)
 
@@ -238,7 +299,7 @@ def saveIndexStocks():
 # Main function
 def main():
     # print(fetcher.fetchCodepip install --upgrade yfinances(12))
-    updateStockData()
+    # updateStockData()
     upDateIndex()
 
 
@@ -247,5 +308,3 @@ if __name__ == "__main__":
     # if not configManager.checkConfigFile():
     #     configManager.setConfig(ConfigManager.parser, default=True, showFileCreatedText=False)
     main()
-    # getData()
-    # saveIndexStocks()
