@@ -60,12 +60,88 @@ class StocksLoader:
             self.stock_data=self.stock_data.merge(self.comadity,left_index=True,right_index=True,how="left")
         # self.prepare_data(self.ndays)
         self.Labels=pd.DataFrame()
-        self.label_data(methods=["combined","quantile","risk_adjusted","dynamic"])
+        # self.label_data(methods=["combined","quantile","risk_adjusted","dynamic"])
+        self.label_data(methods=["return_label"])
         self.stock_data=self.stock_data[filter(lambda x:x not in self.comadity, self.stock_data.columns)]
         self.stock_data=self.stock_data.ffill()
         self.stock_data.to_csv(f"Data.csv")
         self.Labels.to_csv(f"Label.csv")
 
+    def calculate_return_label(self, df, n_days=15, gain_threshold=0.1, loss_threshold=0.05):
+        """
+        Calculate return label for each day:
+        - If within n_days, price increases by at least gain_threshold (m%), label 1 and profit is m%
+        - If within n_days, price drops by at least loss_threshold (l%), label -1 and loss is based on open of next day after threshold breach
+        - Otherwise, label 0 and profit/loss is based on n-th day close
+
+        Args:
+            df (pd.DataFrame): DataFrame with 'Close' and 'Open' columns
+            n_days (int): Number of days to look ahead
+            gain_threshold (float): Gain threshold (e.g., 0.03 for 3%)
+            loss_threshold (float): Loss threshold (e.g., 0.02 for 2%)
+
+        Returns:
+            pd.DataFrame: DataFrame with 'Return_Label' and 'Return_Value'
+        """
+        labels = []
+        returns = []
+        close_prices = df['Close'].values
+        high_prices = df['High'].values
+        open_prices = df['Open'].values
+        n = len(df)
+
+        for i in range(n):
+            label = 0
+            ret = 0.0
+            entry_price = close_prices[i]
+            hit = False
+
+            # Look ahead up to n_days
+            for j in range(1, n_days + 1):
+                if i + j >= n:
+                    break
+                future_high = high_prices[i + j]
+                future_close = close_prices[i + j]
+                high_change = (future_high - entry_price) / entry_price
+                close_change = (future_close - entry_price) / entry_price
+
+                # Check gain threshold
+                if high_change >= gain_threshold:
+                    label = 1
+                    ret = high_change
+                    hit = True
+                    break
+                # Check loss threshold
+                if close_change <= -loss_threshold:
+                    label = -1
+                    # Use open of next day after breach if available, else use close
+                    if i + j + 1 < n:
+                        exit_price = open_prices[i + j + 1]
+                    else:
+                        exit_price = close_prices[i + j]
+                    ret = (exit_price - entry_price) / entry_price
+                    hit = True
+                    break
+
+            if not hit:
+                # Neither threshold hit: use n-th day close if available
+                if i + n_days < n:
+                    final_price = close_prices[i + n_days]
+                    ret = (final_price - entry_price) / entry_price
+                else:
+                    ret = (close_prices[-1] - entry_price) / entry_price
+                label = 0
+
+            labels.append(label)
+            returns.append(ret)
+
+        self.Labels["Return_Label"]=labels
+        self.Labels["Return_Value"]=returns
+        result = pd.DataFrame({
+            'Return_Label': labels,
+            'Return_Value': returns
+        }, index=df.index)
+        return result
 
     
     def get_future_return(self, df, window=5):
@@ -173,7 +249,8 @@ class StocksLoader:
             'combined': self.label_combined,
             'quantile': self.label_quantile,
             'risk_adjusted': self.label_risk_adjusted,
-            'dynamic': self.label_dynamic_threshold
+            'dynamic': self.label_dynamic_threshold,
+            "return_label":self.calculate_return_label
         }
         
         for method in methods:
