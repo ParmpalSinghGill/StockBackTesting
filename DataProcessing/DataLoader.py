@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO,  # You can use DEBUG, INFO, WARNING, ERR
 
 logger=logging.getLogger(__name__)
 class StocksLoader:
-    def __init__(self, stock_symbol=None,ndays=5,addComadity=False,comptidypath="StockData/INDEXData/Comudities.csv"):
+    def __init__(self, stock_symbol=None,ndays=5,useComadity=False,comptidypath="StockData/INDEXData/Comudities.csv"):
         """
         Initialize the StocksLoader with a stock symbol.
         
@@ -18,7 +18,7 @@ class StocksLoader:
         self.labeled_data = None
         self.Benchmark_Close = "NIFTY50_Close"
         self.ndays=ndays
-        self.addComadity=False
+        self.useComadity=False
         self.comptidypath=comptidypath
         self.load_comadity()
         self.load_data()
@@ -41,7 +41,8 @@ class StocksLoader:
         # Get data using DataLoad.getData
         stock_data = getData(stock_Symbol)
         stock_data.index=pd.to_datetime(stock_data.index)
-        stock_data["Adj Close"]=stock_data["Adj Close"].fillna(stock_data["Close"])
+        if "Adj Close" in stock_data.columns:
+            stock_data["Adj Close"]=stock_data["Adj Close"].fillna(stock_data["Close"])
         return stock_data
 
     def load_data(self):
@@ -59,13 +60,15 @@ class StocksLoader:
         if self.comadity is not None:
             self.stock_data=self.stock_data.merge(self.comadity,left_index=True,right_index=True,how="left")
         # self.prepare_data(self.ndays)
-        self.Labels=pd.DataFrame()
+        self.Labels=pd.DataFrame(index=self.stock_data.index)
         # self.label_data(methods=["combined","quantile","risk_adjusted","dynamic"])
         self.label_data(methods=["return_label"])
-        self.stock_data=self.stock_data[filter(lambda x:x not in self.comadity, self.stock_data.columns)]
+        if not self.useComadity:
+            self.stock_data=self.stock_data[filter(lambda x:x not in self.comadity, self.stock_data.columns)]
         self.stock_data=self.stock_data.ffill()
         self.stock_data.to_csv(f"Data.csv")
         self.Labels.to_csv(f"Label.csv")
+        pd.concat((self.stock_data,self.Labels),axis=1).to_csv("FullData.csv")
 
     def calculate_return_label(self, df, n_days=15, gain_threshold=0.1, loss_threshold=0.05):
         """
@@ -132,6 +135,7 @@ class StocksLoader:
                     ret = (close_prices[-1] - entry_price) / entry_price
                 label = 0
 
+            ret=entry_price*(1+ret)
             labels.append(label)
             returns.append(ret)
 
@@ -297,12 +301,15 @@ class StocksLoader:
         Returns:
             pd.DataFrame: Slice of the labeled data
         """
-        if self.labeled_data is None:
+        if self.stock_data is None:
             raise ValueError("No labeled data available. Call load_and_label() first.")
-            
+
+        if self.Labels is None:
+            raise ValueError("No labeled data available. Call load_and_label() first.")
+
         if isinstance(idx, int):
             # Return single row
-            return self.labeled_data.iloc[idx]
+            return self.stock_data.iloc[idx],self.Labels.iloc[idx]
         elif isinstance(idx, slice):
             # Return slice of data
             return self.labeled_data.iloc[idx]
@@ -315,43 +322,7 @@ if __name__ == "__main__":
     
     # Initialize loader with HDFCBANK
     loader = StocksLoader("HDFCBANK")
+    print(loader[2])
     # print(list(loader.stock_data.columns))
     # print(loader.stock_data.tail())
     
-    # # Test 1: Load and label in one step
-    # print("\nTest 1: Loading and labeling data in one step")
-    # labeled_data = loader.load_and_label(
-    #     window=5,
-    #     method='combined',
-    #     fixed_threshold=0.03,
-    #     relative_margin=0.02
-    # )
-    # print(f"Data shape: {labeled_data.shape}")
-    # print("\nFirst few rows of labeled data:")
-    # print(labeled_data[['Date', 'Close', 'Future_Return', 'Label_Combined']].head())
-    
-    # # Test 2: Access data using indexing
-    # print("\nTest 2: Accessing data using indexing")
-    # first_row = loader[0]
-    # print("\nFirst row:")
-    # print(first_row[['Date', 'Close', 'Future_Return', 'Label_Combined']])
-    
-    # # Test 3: Access data using slicing
-    # print("\nTest 3: Accessing data using slicing")
-    # first_5_rows = loader[:5]
-    # print("\nFirst 5 rows:")
-    # print(first_5_rows[['Date', 'Close', 'Future_Return', 'Label_Combined']])
-    
-    # # Test 4: Try different labeling methods
-    # print("\nTest 4: Testing different labeling methods")
-    # methods = ['quantile', 'risk_adjusted', 'dynamic']
-    # for method in methods:
-    #     print(f"\nTesting {method} labeling method:")
-    #     labeled_data = loader.load_and_label(
-    #         window=5,
-    #         method=method
-    #     )
-    #     label_col = f'Label_{method.capitalize()}'
-    #     print(f"Data shape: {labeled_data.shape}")
-    #     print(f"Label distribution for {label_col}:")
-    #     print(labeled_data[label_col].value_counts())

@@ -101,24 +101,54 @@ def getDatFrame(stockData):
 def _path_from_root(relative_path: str) -> str:
     return os.path.join(PROJECT_ROOT, relative_path)
 
+def getFullData(stockCode,append_exchange = ".NS"):
+        return  yf.download(
+        tickers=stockCode + append_exchange,
+        interval='1d',
+        progress=False,
+        timeout=10,
+				)
+    # return  yf.download(
+	# 	tickers=tickers,
+	# 	period=str(365*50)+"d",
+	# 	interval='1d',
+	# 	proxy="",
+	# 	progress=False,
+	# 	timeout=10
+	# )
+
+
 
 def UpdateFullStockData(stockDict):
     with open(_path_from_root("StockData/AllSTOCKS.pk"), "rb") as f:
         FullData=pk.load(f)
     Nodata=0
+    i,total=0,len(stockDict)
     for k,v in stockDict.items():
-        df=getDatFrame(v)
-        df.columns=list(map(lambda x:x[0],df.columns))
-        if df.shape[0]==0:
-            print(f"No Data for {k}")
-            Nodata+=1
-            continue
-        if k not in FullData:
-            FullData[k] = {"data":df.values,"columns":df.columns,"index":df.index}
-            continue
-        fuldatadf=getDatFrame(FullData[k])
-        fuldatadf=pd.concat([fuldatadf, df[~df.index.isin(fuldatadf.index)]])
-        FullData[k]={"data":fuldatadf.values,"columns":fuldatadf.columns,"index":fuldatadf.index}
+        try:    
+            df=getDatFrame(v)
+            df.columns=list(map(lambda x:x[0],df.columns))
+            if df.shape[0]==0:
+                print(f"No Data for {k}")
+                Nodata+=1
+                continue
+            if k not in FullData:
+                FullData[k] = {"data":df.values,"columns":df.columns,"index":df.index}
+                continue
+            fuldatadf=getDatFrame(FullData[k])
+            lastindex=fuldatadf.index[-1]
+            if lastindex in df.index and (abs(fuldatadf.loc[lastindex,"Close"]-df.loc[lastindex,"Close"])/fuldatadf.loc[lastindex,"Close"]<0.01):
+                fuldatadf=pd.concat([fuldatadf, df[~df.index.isin(fuldatadf.index)]])
+                FullData[k]={"data":fuldatadf.values,"columns":fuldatadf.columns,"index":fuldatadf.index}
+            else:
+                print(f"{i}/{total} Seems Difference in {k:10} Price change from {fuldatadf.loc[lastindex,"Close"]:.2f}  to {df.loc[lastindex,"Close"] if lastindex in df.index else 0:.2f} so redownloading....")
+                newfulldf=getFullData(k)
+                FullData[k]={"data":newfulldf.values,"columns":list(map(lambda x:x[0],newfulldf.columns)),"index":newfulldf.index}
+            i=i+1
+        except Exception as e:
+            print(f"Error in {k} {e}")
+            print(fuldatadf.shape,df.shape)
+            # raise e
     with open(_path_from_root("StockData/AllSTOCKS.pk"), "wb") as f:
         pk.dump(FullData,f)
     print(f"All Stock Updated {Nodata} Stock with no Data  out of {len(FullData)}")
@@ -299,7 +329,7 @@ def saveIndexStocks():
 # Main function
 def main():
     # print(fetcher.fetchCodepip install --upgrade yfinances(12))
-    # updateStockData()
+    updateStockData()
     upDateIndex()
 
 

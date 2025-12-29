@@ -13,12 +13,14 @@ from PlotCode.PlotCandles import PlotMACDForTrade
 import logging
 DEBUG=False
 DEBUGEVERY=True
+SLComparison="Low" # Close Low
+
+logging.basicConfig(level=logging.INFO,  # You can use DEBUG, INFO, WARNING, ERROR, CRITICAL
+                    format='%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s')
 if not DEBUG: DEBUGEVERY=False
 # Create a console handler and set its level
 console_handler = logging.StreamHandler()
 if DEBUG: console_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
 # Add the handler to the logger
 logger=logging.getLogger("BackTesting")
 logger.addHandler(console_handler)
@@ -27,6 +29,7 @@ if DEBUG: logger.setLevel(logging.DEBUG)
 
 def getBrokrage(ammount,brokragePercent=0.24):
     return ammount*brokragePercent/100
+
 def SellStock(Key,ammount,sellprice,i,position,TradesList,df,reason="Target"):
     logger.debug(f"Bought at {position['BuyPrice']:.2f} Selling at {sellprice:.2f} and quantity {position['Quantity']} reason {reason}")
     ammount += position["Quantity"] * sellprice-getBrokrage(position["Quantity"] * sellprice)
@@ -39,6 +42,7 @@ def SellStock(Key,ammount,sellprice,i,position,TradesList,df,reason="Target"):
     return ammount
 
 def calculateInvestmentGain(df, ammount=10000, startindays=100):
+    if df.shape[0]==0: return 0
     if df.shape[0]>startindays:
         buyprice=df.loc[df.index[startindays],"High"]
     else:
@@ -61,7 +65,7 @@ def TargetStopLosssTesting(Key,df,ammount=10000,startindays=100,discountpercent=
     :return:
     """
     TradesList,Positions = [],[]
-    if df.shape[0]<startindays-10: return
+    if df.shape[0]<startindays-10: return ammount,TradesList,0
     for i in range(startindays,df.shape[0]):
         today,todatedate,pastData = df.iloc[i],df.index[i],df[:i]
         High,Low=pastData["High"].values[-1],pastData["Low"].values[-1]
@@ -103,6 +107,7 @@ def TargetStopLosssTesting(Key,df,ammount=10000,startindays=100,discountpercent=
                 ammount = SellStock(Key,ammount, sellprice, i, position, TradesList, df, reason="SellSignal")
             Positions=[]
         if DEBUGEVERY: time.sleep(.1)
+
     LatestPrice=df["Close"].values[-1]
     for position in Positions:
         sellprice = LatestPrice - LatestPrice * discountpercent
@@ -121,7 +126,7 @@ def TrailingStopLosssFixTargetTesting(Key,df,ammount=10000,startindays=100,disco
     """
 
     TradesList,Positions = [],[]
-    if df.shape[0]<startindays-10: return
+    if df.shape[0]<startindays-10: return ammount,TradesList,0
     for i in range(startindays,df.shape[0]):
         pastData,today=df[:i],df.iloc[i]
         High,Low,Close=pastData["High"].values[-1],pastData["Low"].values[-1],pastData["Close"].values[-1]
@@ -178,15 +183,23 @@ def TrailingStopLosssTesting(Key,df,ammount=10000,startindays=100,discountpercen
     """
 
     TradesList,Positions = [],[]
-    if df.shape[0]<startindays-10: return
+    if df.shape[0]<startindays-10: return ammount,TradesList,0
     for i in range(startindays,df.shape[0]):
         pastData,today=df[:i],df.iloc[i]
         High,Low,Close=pastData["High"].values[-1],pastData["Low"].values[-1],pastData["Close"].values[-1]
         if len(Positions)>0:
             remaniedPositions=[]
             for position in Positions:
-                if Low < position["StopLoss"]:
+                if SLComparison=="Low" and Low < position["StopLoss"]:
                     sellprice = position["StopLoss"] - position["StopLoss"] * discountpercent
+                    if printFlag:print("Stoploss Hitt",Close,position)
+                    ammount=SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
+                elif SLComparison=="Close" and Close < position["StopLoss"]:
+                    if i<df.shape[0]-1:
+                        sellprice=df.loc[i+1,"Open"]*(1-discountpercent)
+                    else:
+                        sellprice=Close*(1-discountpercent)
+                        # sellprice = position["StopLoss"] - position["StopLoss"] * discountpercent
                     if printFlag:print("Stoploss Hitt",Close,position)
                     ammount=SellStock(Key,ammount, sellprice, i, position, TradesList, df,reason="StopLoss")
                 else:
@@ -257,7 +270,7 @@ def saveTrades(TradesList,method,key):
         if len(TradesList)==0: return
         os.makedirs(f"Results/{method}",exist_ok=True)
         df=pd.DataFrame(TradesList)
-        print(df)
+        # print(df)
         df["Profit"]=df["BuyPrice"]<df["SelPrice"]
         df.to_csv(f"Results/{method}/{key}.csv",index=None)
     except Exception as e:
@@ -277,6 +290,7 @@ def DobackTesting(df,Key="",ammount=10000,startindays=100,discountpercent=.002,m
         logger.info(f"Doing BackTesting from Start To {CONFIG.ENDDATE}")
         endDate=datetime.datetime.strptime(CONFIG.ENDDATE,"%Y-%m-%d")
         df=df[:endDate+datetime.timedelta(days=1)]
+
 
 
     baseammount=ammount
@@ -312,7 +326,7 @@ def AllStock():
         ProcessStock(stockdict,k,printResults=True)
 
 def FurtherAnalaysis(df):
-    print(df.columns)
+    # print(df.columns)
     longtermgain= df["longtermgain"].sum()
     if "TraidingLoss" in df.columns:
         TraidingProfit= df["TraidingGain"].sum()-df["TraidingLoss"].sum()
@@ -328,7 +342,8 @@ def FurtherAnalaysis(df):
 
 
 def AllStockMultProcessing(type="ALL",method="SL&T"):
-    assert method in ("TSL&T","TSL","SL&T") #TrailingStopLosssFixTargetTesting TrailingStopLosssFixTargetTesting TargetStopLosssTesting
+    assert method in ("TSL&T","TSL","SL&T")
+    #TrailingStopLosssFixTargetTesting TrailingStopLosssTesting TargetStopLosssTesting
     stockdict=getData()
     if type=="ALL":
         keys=stockdict.keys()
@@ -341,22 +356,26 @@ def AllStockMultProcessing(type="ALL",method="SL&T"):
             keys=pk.load(f)[type]
             stockdictlist=[stockdict for k in keys]
     st=time.time()
+    results=[]
+    # for sd,k,m in zip(stockdictlist,keys,itertools.repeat(method)):
+    #     results.append(ProcessStock(sd,k,m))
     with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
         # Submit the tasks and collect results
         results = list(executor.map(ProcessStock, stockdictlist,keys,itertools.repeat(method)))
     df=pd.DataFrame(results)
     del df["resp"]
     os.makedirs("Results",exist_ok=True)
-    df.to_csv(f"Results/Results{method}.csv",index=None)
+    df.to_csv(f"Results/Results{method}_{SLComparison}.csv",index=None)
     print("Total Time Taken ",time.time()-st,"Results Save at",f"Results/Results{method}.csv")
 
 if __name__ == '__main__':
     # AllStock()
-    stype="Nifty50"
+    # stype="Nifty50"
     # stype="SELECTED"
-    method="SL&T"
+    stype="ALL"
+    # method="SL&T"
     # method="TSL&T"
-    # method="TSL"
+    method="TSL"
     AllStockMultProcessing(stype,method=method)
     # FurtherAnalaysis(pd.read_csv(f"Results/Results{method}.csv"))
     # SingleStock("MARUTI")
