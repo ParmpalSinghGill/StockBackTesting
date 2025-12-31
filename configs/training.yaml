@@ -1,0 +1,13 @@
+# Training Configuration
+output_dir: "Results/experiment_1"
+save_model: true
+metrics:
+  - "precision"
+  - "recall"
+  - "f1"
+  - "accuracy"
+  - "confusion_matrix"
+
+evaluation:
+  compare_baseline: true # Compare with random and EMA crossover
+  show_plots: false # Set to true to generate and save plots

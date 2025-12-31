@@ -1,5 +1,8 @@
 StockData
+Results/
+backtest
 Stocks
+models/
 *.csv
 .idea
 .*

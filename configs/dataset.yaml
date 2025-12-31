@@ -1,0 +1,11 @@
+# Dataset Configuration
+data_path: "StockData/AllSTOCKS.pk"
+source_tickers: ["HDFCBANK"] # List of stocks to train on (e.g. ["RELIANCE", "TCS"]). null means all.
+target_tickers: ["HDFCBANK"] # List of stocks to predict/test on. null means all.
+# target_stock: null # Deprecated
+holding_period: 10 # N days
+target_pct: 0.05 # 5% profit target
+stop_loss_pct: 0.02 # 2% stop loss
+train_end_date: "2023-12-31"
+test_start_date: "2024-01-01"
+feature_config: "configs/indicators_full.yaml" # or indicators_min.yaml

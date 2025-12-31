@@ -1,0 +1,16 @@
+# Minimal Indicator Configuration
+indicators:
+  - name: "Returns"
+    type: "price"
+    params:
+      windows: [1, 5]
+
+  - name: "SMA"
+    type: "trend"
+    params:
+      windows: [20, 50]
+
+  - name: "RSI"
+    type: "momentum"
+    params:
+      window: 14

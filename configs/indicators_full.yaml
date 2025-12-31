@@ -1,0 +1,77 @@
+# Full Indicator Configuration
+indicators:
+  # Price-based
+  - name: "Returns"
+    type: "price"
+    params:
+      windows: [1, 3, 5, 10, 20]
+
+  - name: "LogReturns"
+    type: "price"
+    params:
+      windows: [1]
+
+  # Volume-based
+  - name: "VolumeChange"
+    type: "volume"
+    params:
+      windows: [1, 5]
+  
+  - name: "OBV" # On-Balance Volume
+    type: "volume"
+    params: {}
+
+  - name: "VWMA" # Volume Weighted Moving Average
+    type: "volume"
+    params:
+      windows: [20]
+
+  # Trend
+  - name: "SMA"
+    type: "trend"
+    params:
+      windows: [10, 20, 50, 200]
+
+  - name: "EMA"
+    type: "trend"
+    params:
+      windows: [10, 20, 50]
+  
+  - name: "SMA_Slope"
+    type: "trend"
+    params:
+      windows: [20]
+
+  # Momentum
+  - name: "RSI"
+    type: "momentum"
+    params:
+      window: 14
+
+  - name: "ROC" # Rate of Change
+    type: "momentum"
+    params:
+      windows: [5, 10, 20]
+
+  # Volatility
+  - name: "ATR" # Average True Range
+    type: "volatility"
+    params:
+      window: 14
+
+  - name: "RollingStd"
+    type: "volatility"
+    params:
+      windows: [20]
+
+  - name: "BB_Width" # Bollinger Band Width
+    type: "volatility"
+    params:
+      window: 20
+      std_dev: 2
+
+  # Statistical
+  - name: "ZScore"
+    type: "stat"
+    params:
+      windows: [20, 60]

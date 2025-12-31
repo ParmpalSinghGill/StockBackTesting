@@ -1,9 +1,13 @@
 import os,time
+import difflib
 import pickle
 import pickle as pk
 import pandas as pd
 
 os.makedirs("StockData/INDEX", exist_ok=True)
+
+AllStocks=None
+ComditiyDict=None
 
 tickerMapping = {
     "NIFTY50": "https://archives.nseindia.com/content/indices/ind_nifty50list.csv",
@@ -35,14 +39,32 @@ def readFile(path):
     except FileNotFoundError:
         with open("../"+path, "rb") as f:
             return  pk.load(f)
+            
+
+def getTickerFromName(name):
+    global ComditiyDict
+    if ComditiyDict is None:
+        ComditiyDict=pd.read_csv("StockData/EQUITY_L.csv")
+        ComditiyDict={row["NAME OF COMPANY"].lower():row["SYMBOL"] for i,row in ComditiyDict.iterrows()}
+    name=name.lower().replace("ltd","limited")
+    expcase={"adani port & sez limited":"ADANIPORTS"}
+    if name in expcase:
+        return expcase[name]
+    matches = difflib.get_close_matches(name, ComditiyDict.keys(), n=1, cutoff=0.6)
+    if matches:
+        return ComditiyDict[matches[0]]
+    return None
+
 
 def getData(key=None):
-    Fulldata=readFile("StockData/AllSTOCKS.pk")
+    global AllStocks,ComditiyDict
+    if AllStocks is None:
+        AllStocks=readFile("StockData/AllSTOCKS.pk")
     if key is None:
-        return Fulldata
-    elif key in Fulldata:
-        return getDatFrame(Fulldata[key])
-    else:
+        return AllStocks
+    elif key in AllStocks:
+        return getDatFrame(AllStocks[key])
+    elif key in ['NIFTY50', 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14]:
         IndexPath=f"StockData/INDEX/{key}.pk"
         if not os.path.exists(IndexPath) or (time.time() - os.path.getmtime(IndexPath)) > 2629800: # ~30.4 days
             symbollist=pd.read_csv(tickerMapping[key])["Symbol"].values
@@ -50,7 +72,21 @@ def getData(key=None):
                 pickle.dump(symbollist,f)
         with open(IndexPath,"rb") as f:
             symbollist=pickle.load(f)
-        return {k:v for k,v in Fulldata.items() if k in symbollist}
+        return {k:v for k,v in AllStocks.items() if k in symbollist}
+    else:
+        if ComditiyDict is None:
+            ComditiyDict=pd.read_csv("StockData/EQUITY_L.csv")
+            ComditiyDict={row["NAME OF COMPANY"].lower():row["SYMBOL"] for i,row in ComditiyDict.iterrows()}
+        if key.lower() in ComditiyDict:
+            return getDatFrame(AllStocks[ComditiyDict[key.lower()]])            
+        else:
+            ticker = getTickerFromName(key)
+            if ticker:
+                # print(f"Ticker found for {key} : {ticker}")
+                if ticker in AllStocks:
+                    return getDatFrame(AllStocks[ticker])
+            # print(f"Key {key} not found")
+            return None
 
 
 
@@ -59,4 +95,5 @@ def getMyStocks():
     with open("DataProcessing/MyStock") as f:
         data=[d[:-1] for d in f.readlines()]
     return data
+
 

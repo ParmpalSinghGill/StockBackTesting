@@ -1,0 +1,9 @@
+
+data_path: "synthetic_data.pk"
+target_stock: null
+holding_period: 5
+target_pct: 0.02
+stop_loss_pct: 0.01
+train_end_date: "2023-12-31"
+test_start_date: "2024-01-01"
+feature_config: "configs/indicators_min.yaml"
