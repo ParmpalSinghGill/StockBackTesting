@@ -2,7 +2,7 @@ StockData
 Results/
 backtest
 Stocks
-models/
+models/__pycache__
 *.csv
 .idea
 .*

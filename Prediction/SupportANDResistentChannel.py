@@ -9,7 +9,10 @@ from DataProcessing.DataLoad import getData
 
 
 class SRChannels:
-    def __init__(self, period=10, source='High/Low', channel_width_percentage=6, min_strength=1, max_num_sr=6, loopback=290):
+    """
+    THis class implement support and resistent channel same for the Trainding view App provides
+    """
+    def __init__(self, period=10, source='High/Low', channel_width_percentage=6, min_strength=1, max_num_sr=6, loopback=290,SRSelection="Default"):
         self.period = period
         self.source = source
         self.channel_width_percentage = channel_width_percentage
@@ -17,6 +20,7 @@ class SRChannels:
         self.max_num_sr = max_num_sr
         self.loopback = loopback-1
         self.calculationDays=600
+        self.SRSelection=SRSelection
 
 
     def ForwarFillPivots(self, pivot_high, pivot_low):
@@ -88,58 +92,67 @@ class SRChannels:
                     self.changeit(x,y,supportandRessitent)
         return supportandRessitent
 
-    def getSupportAndRessitent(self,fulldf,nDays=0):
+    def getSupportAndRessitent(self,fulldf):
         self.df=fulldf
         self.df=self.df[-self.calculationDays:]
         # get Channel width with high low of last year
         self.channel_width=(self.df.iloc[-300:, self.df.columns.get_loc("High")].max() - self.df.iloc[-300:, self.df.columns.get_loc("Low")].min()) * self.channel_width_percentage / 100
         # Calculate Pivot Points
         pivotvals = self.calculate_pivot_points(self.df["High"], self.df["Low"], self.df["Close"], self.df["Open"])
-        # print(pivotvals)
+        print(pivotvals)
         sandr=[self.get_SR_vals(x, pivotvals) for x in pivotvals]
         # print(sandr)
         supres=self.getStrongSupportAndRessitent(pivotvals,sandr)
         # print(len(supres),supres)
+        if self.SRSelection=="EqualBoth":
+            support=sorted([s for s in supres if s[1]<self.df.iloc[-1, self.df.columns.get_loc("Close")]])
+            resistence=sorted([s for s in supres if s[0]>self.df.iloc[-1, self.df.columns.get_loc("Close")]])
+            atpoint=[s for s in supres if s[1]>=self.df.iloc[-1, self.df.columns.get_loc("Close")]>=s[0]]
+            supres=atpoint
+            for s,r in zip(support,resistence):
+                supres.append(s)
+                supres.append(r)
+        elif self.SRSelection=="Nearest":
+            # print([(s[0],s[1],) for s in supres])
+            supres=sorted(supres,key=lambda x:abs(self.df.iloc[-1, self.df.columns.get_loc("Close")]-(x[0]+x[1])/2))
         supres=supres[:self.max_num_sr]
         return supres
 
 
-
-# Example Usage
-def main():
-    # Input Parameters
-    timeframe = 'D'  # Higher Time Frame
-    prd = 10  # Pivot Period
-    loopback = 290  # 290  # Loopback Period
-    channel_width_pct = 6  # Maximum Channel Width (%)
-    min_strength = 1  # Minimum Strength
-    max_num_sr = 6  # Maximum Number of S/R to Show
-
-    timeframe = 'D'  # Higher Time Frame
-    prd = 10  # Pivot Period
-    loopback = 590  # 290  # Loopback Period
-    channel_width_pct = 6  # Maximum Channel Width (%)
-    min_strength = 1  # Minimum Strength
-    max_num_sr = 6  # Maximum Number of S/R to Show
-
-
-    # data=getData("SBILIFE")
-    # data=getData("HINDUNILVR")
-    # data = getData("HDFCBANK")
-    data = getData("TCS")
-    # data = getData("HYUNDAI")
-    # data["time"] = pd.to_datetime(data.index)
-    # data.columns = ['open', 'high', 'low', 'close', 'Adj Close', 'Volume', 'time']
-    # DateAfter=datetime.datetime.strptime("22-10-15","%y-%m-%d")
-    # data=data[data.index>=DateAfter]
-    print(data.shape)
-
-    df=data
-    sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback)
+def plotSupportAndRessitent(ticker:str,timeframe:str='1D',prd:int=10,loopback:int=290,channel_width_pct:int=6,min_strength:int=1,max_num_sr:int=6):
+    df = getData(ticker)
+    if timeframe == '1D':
+        pass
+    else:
+        print("TimeFrame not supported")
+        return
+    sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback,SRSelection="Nearest")
     spandr=sr.getSupportAndRessitent(df)
     print(spandr)
-    PlotChart(df[-150:],Trend="S&R",Bars=spandr)
+    PlotChart(df[-150:],Trend=f"S&R for {ticker}",Bars=spandr)
 
+# Example Usage
+def main(ticker):
+    # # Input Parameters
+    # timeframe = '1D'  # Higher Time Frame
+    # prd = 10  # Pivot Period
+    # loopback = 290  # 290  # Loopback Period
+    # channel_width_pct = 6  # Maximum Channel Width (%)
+    # min_strength = 1  # Minimum Strength
+    # max_num_sr = 6  # Maximum Number of S/R to Show
+
+    timeframe = '1D'  # Higher Time Frame
+    prd = 10  # Pivot Period
+    loopback = 365  # 290  # Loopback Period
+    channel_width_pct = 6  # Maximum Channel Width (%)
+    min_strength = 1  # Minimum Strength
+    max_num_sr = 6  # Maximum Number of S/R to Show
+    plotSupportAndRessitent(ticker=ticker,prd=prd,loopback=loopback,channel_width_pct=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr)
+
+
+ 
 if __name__ == "__main__":
-    main()
+    # main(ticker="WEBELSOLAR")
+    main(ticker="TATATECH")
+
 

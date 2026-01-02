@@ -35,8 +35,8 @@ def price_level_story(
         if temp.empty:
             return None, None
 
-        high = temp[price_col].max()
-        low = temp[price_col].min()
+        high = temp["High"].max() if "High" in temp.columns else temp[price_col].max()
+        low = temp["Low"].min() if "Low" in temp.columns else temp[price_col].min()
 
         dist_high = (high - price) / high
         dist_low = (price - low) / low
@@ -85,6 +85,30 @@ def price_level_story(
         story.append(
             "Price is trading away from major highs and lows, indicating a neutral or range-bound phase."
         )
+        details = []
+        for label, days in checks:
+            if days:
+                start = last_date - pd.Timedelta(days=days)
+                temp = df.loc[df.index >= start]
+            else:
+                temp = df
+            
+            if not temp.empty:
+                h = temp["High"].max() if "High" in temp.columns else temp[price_col].max()
+                l = temp["Low"].min() if "Low" in temp.columns else temp[price_col].min()
+                d_h = (price - h) / h * 100
+                d_l = (price - l) / l * 100
+                details.append(f"{label}: {d_h:.1f}%H / {d_l:.1f}%L")
+        
+        if details:
+            story.append("Range Details: [" + ", ".join(details) + "]")
+
+    all_time_high = df["High"].max() if "High" in df.columns else df[price_col].max()
+    all_time_low = df["Low"].min() if "Low" in df.columns else df[price_col].min()
+    diff_ath = (price - all_time_high) / all_time_high * 100
+    diff_atl = (price - all_time_low) / all_time_low * 100
+    
+    story.append(f"It is {diff_ath:.2f}% from its all-time high and {diff_atl:.2f}% from its all-time low.")
 
     return " ".join(story)
 
@@ -115,7 +139,7 @@ def AllPortfolioStocksData():
 def Analysis():
     for sname,df in AllPortfolioStocksData().items():
         # print(sname,df.shape)
-        print("*"*100)
+        print("*"*150)
         print(sname,price_level_story(df))
 
 Analysis()

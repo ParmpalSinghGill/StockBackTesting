@@ -1,6 +1,6 @@
 import datetime
-import os
-
+import os,sys
+sys.path.append(os.getcwd())
 import warnings
 import pandas as pd
 import mplfinance as mpf
@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 from Prediction.SuperTrend import supertrend
 
 warnings.filterwarnings('ignore')
-os.chdir("../")
+
+# os.chdir("../")
 
 
 def fetch_asset_data(symbol, start_date, interval, exchange):
@@ -157,6 +158,7 @@ def OneCall():
 
 def BackTesting(symbol="HDFCBANK",datestart="2024-03-20",volatility=3):
 	startdate=datetime.datetime.strptime(datestart,"%Y-%m-%d")
+	# print(getData(symbol).shape)
 	df = getData(symbol)[startdate:]
 	position_list=[]
 	for index in range(30, df.shape[0]):
@@ -164,8 +166,10 @@ def BackTesting(symbol="HDFCBANK",datestart="2024-03-20",volatility=3):
 		supertrenddf = supertrend(df=pastdf, atr_multiplier=volatility)
 		position_list.append(supertrenddf[-1:])
 	trenddf=pd.concat(position_list)
+	print(trenddf.columns)
 	plot_data(trenddf, symbol=symbol)
 
 
 if __name__ == '__main__':
-	BackTesting()
+	BackTesting("WEBELSOLAR")
+	# print(getData("WEBELSOLAR").shape)
