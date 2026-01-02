@@ -18,7 +18,8 @@ from matplotlib.patches import Rectangle
 
 def PlotCandles(df,figratio=(30, 8),Trend=None,xrotation=45,nbins=30,addIndicatorSpace=False,sharex=True):
 	df.index = df.index.map(lambda x: x.to_pydatetime())
-	title=f'Candlestick chart for {Trend}' if Trend else "Candlestick"
+	# title=f'Candlestick chart for {Trend}' if Trend else "Candlestick"
+	title=f'{Trend}' if Trend else "Candlestick"
 	if addIndicatorSpace:
 		fig, (ax_candle, ax_volumn,ax_indicater) = plt.subplots(3, 1, figsize=(20, 10), sharex=sharex, gridspec_kw={'height_ratios': [3, 1,1], 'hspace': 0})
 		mpf.plot(df, type='candle', style='charles',ax=ax_candle,ylabel='Price ', volume=ax_volumn, datetime_format='%y-%m-%d',
@@ -48,10 +49,11 @@ def PlotCandles(df,figratio=(30, 8),Trend=None,xrotation=45,nbins=30,addIndicato
 
 
 def PlotChart(df,Trend=None,TrendBox=None,LineS=None,Bars=None,addCloseLine=True):
+	# fig, (ax_candle,ax_volumn,ax_indicater)=PlotCandles(df,figratio=(30, 8),Trend=Trend,addIndicatorSpace=True)
 	fig, (ax_candle,ax_volumn)=PlotCandles(df,figratio=(30, 8),Trend=Trend)
-	lasclose=df["Close"][-1]
+	lastclose=df["Close"][-1]
 	if addCloseLine:
-		ax_candle.axhline(y=lasclose, color='black', linestyle='-', linewidth=1.5)
+		ax_candle.axhline(y=lastclose, color='black', linestyle='-', linewidth=1.5)
 
 	if LineS is not None:
 		for line in LineS:
@@ -77,8 +79,8 @@ def PlotChart(df,Trend=None,TrendBox=None,LineS=None,Bars=None,addCloseLine=True
 
 	if Bars is not None :
 		for bar in Bars:
-			high_price,low_price=bar
-			color="green" if lasclose>high_price else "red" if lasclose<low_price else "lime"
+			high_price,low_price=bar[:2]
+			color="green" if lastclose>high_price else "red" if lastclose<low_price else "lime"
 			TrendStart , TrnedEnd=df.index[0],df.index[-1]
 			highlight_start_mdate = mdates.date2num(pd.to_datetime(TrendStart))
 			highlight_end_mdate = mdates.date2num(pd.to_datetime(TrnedEnd))
@@ -93,7 +95,8 @@ def PlotChart(df,Trend=None,TrendBox=None,LineS=None,Bars=None,addCloseLine=True
 
 
 	# Set date format and frequency of the labels
-	ax_candle.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))  # Show labels every week
+	intervals=mdates.WeekdayLocator(interval=1) if df.shape[0]<150 else mdates.MonthLocator(interval=1) if df.shape[0]<1000 else mdates.MonthLocator(interval=3) if df.shape[0]<2000 else mdates.MonthLocator(interval=6)
+	ax_candle.xaxis.set_major_locator(intervals)  # Show labels every week
 	ax_candle.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d'))  # Format labels as 'Year-Month-Day'
 
 	# Rotate date labels to make them readable

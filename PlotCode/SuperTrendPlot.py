@@ -156,7 +156,7 @@ def OneCall():
 	# # Plot the performance curve
 	# plot_performance_curve(supertrend_df)
 
-def BackTesting(symbol="HDFCBANK",datestart="2024-03-20",volatility=3):
+def PlotSupperTrend(symbol="HDFCBANK",datestart="2024-03-20",volatility=3):
 	startdate=datetime.datetime.strptime(datestart,"%Y-%m-%d")
 	# print(getData(symbol).shape)
 	df = getData(symbol)[startdate:]
@@ -171,5 +171,5 @@ def BackTesting(symbol="HDFCBANK",datestart="2024-03-20",volatility=3):
 
 
 if __name__ == '__main__':
-	BackTesting("WEBELSOLAR")
+	PlotSupperTrend("WEBELSOLAR")
 	# print(getData("WEBELSOLAR").shape)

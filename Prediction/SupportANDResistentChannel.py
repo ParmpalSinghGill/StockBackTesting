@@ -12,7 +12,7 @@ class SRChannels:
     """
     THis class implement support and resistent channel same for the Trainding view App provides
     """
-    def __init__(self, period=10, source='High/Low', channel_width_percentage=6, min_strength=1, max_num_sr=6, loopback=290,SRSelection="Default"):
+    def __init__(self, period=10, source='High/Low', channel_width_percentage=6, min_strength=1, max_num_sr=6, loopback=290,SRSelection="Default",addstrengh=False):
         self.period = period
         self.source = source
         self.channel_width_percentage = channel_width_percentage
@@ -21,6 +21,7 @@ class SRChannels:
         self.loopback = loopback-1
         self.calculationDays=600
         self.SRSelection=SRSelection
+        self.addstrengh=addstrengh
 
 
     def ForwarFillPivots(self, pivot_high, pivot_low):
@@ -28,6 +29,8 @@ class SRChannels:
         pivot = pivot_high.where(pivot_high != 0, pivot_low)
         pivot=pivot.reset_index(drop=True)
         pivot=pivot[pivot>0]
+        if pivot.shape[0]==0:
+            return []
         pivotebeforlopback=pivot[pivot.index > (pivot.index[-1] - self.loopback)].values[::-1]
         seen = set()
         return [x for x in pivotebeforlopback if not (x in seen or seen.add(x))] # remove dupli
@@ -69,14 +72,17 @@ class SRChannels:
         for x in range(len(pivotvals)):
             stv=-1
             stl=-1
-            for y,sup in enumerate(supres):
+            for y,sup in enumerate(supres): 
                 if sup[0]>stv and sup[0]>=self.min_strength*self.period*2:
                     stv,stl=sup[0],y
             if stl >= 0:
                 # get sr level
                 hh = supres[stl][1]
                 ll = supres[stl][2]
-                supportandRessitent.append([hh,ll])
+                if self.addstrengh:
+                    supportandRessitent.append([hh,ll,supres[stl][0]//self.period*2])
+                else:
+                    supportandRessitent.append([hh,ll])
                 stren.append(supres[stl][0])
 
                 for sp in supres:
@@ -93,15 +99,15 @@ class SRChannels:
         return supportandRessitent
 
     def getSupportAndRessitent(self,fulldf):
+        self.loopback=min(self.loopback,fulldf.shape[0])
         self.df=fulldf
         self.df=self.df[-self.calculationDays:]
         # get Channel width with high low of last year
         self.channel_width=(self.df.iloc[-300:, self.df.columns.get_loc("High")].max() - self.df.iloc[-300:, self.df.columns.get_loc("Low")].min()) * self.channel_width_percentage / 100
         # Calculate Pivot Points
         pivotvals = self.calculate_pivot_points(self.df["High"], self.df["Low"], self.df["Close"], self.df["Open"])
-        print(pivotvals)
+        # print(pivotvals)
         sandr=[self.get_SR_vals(x, pivotvals) for x in pivotvals]
-        # print(sandr)
         supres=self.getStrongSupportAndRessitent(pivotvals,sandr)
         # print(len(supres),supres)
         if self.SRSelection=="EqualBoth":
@@ -126,10 +132,10 @@ def plotSupportAndRessitent(ticker:str,timeframe:str='1D',prd:int=10,loopback:in
     else:
         print("TimeFrame not supported")
         return
-    sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback,SRSelection="Nearest")
+    sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback,SRSelection="Nearest",addstrengh=True)
     spandr=sr.getSupportAndRessitent(df)
     print(spandr)
-    PlotChart(df[-150:],Trend=f"S&R for {ticker}",Bars=spandr)
+    # PlotChart(df[-150:],Trend=f"S&R for {ticker}",Bars=spandr)
 
 # Example Usage
 def main(ticker):
