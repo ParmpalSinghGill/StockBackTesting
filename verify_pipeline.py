@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
-from data.dataset import SwingDataset
+from data.SwingDataset import SwingDataset
 from models.ml_models import MLModelWrapper
 from backtest.simulator import Backtester
 

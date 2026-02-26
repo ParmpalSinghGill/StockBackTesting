@@ -1,11 +1,10 @@
 #!/usr/bin/python3
-import datetime
 # Pyinstaller compile Windows: pyinstaller --onefile --icon=src\icon.ico src\UpdateHistoryData.py  --hidden-import cmath --hidden-import talib.stream --hidden-import numpy --hidden-import pandas --hidden-import alive-progress --hidden-import chromadb
 # Pyinstaller compile Linux  : pyinstaller --onefile --icon=src/icon.ico src/UpdateHistoryData.py  --hidden-import cmath --hidden-import talib.stream --hidden-import numpy --hidden-import pandas --hidden-import alive-progress --hidden-import chromadb
 
 # Keep module imports prior to classes
 import yfinance as yf
-import time
+import time,random,datetime
 # from yfinance.shared import YFRateLimitError
 import os,sys
 import yfinance as yf
@@ -29,7 +28,7 @@ import classes.ConfigManager as ConfigManager
 from classes.ColorText import colorText
 from alive_progress import alive_bar
 # os.chdir("../")
-from datetime import datetime, date
+from datetime import date
 
 configManager = ConfigManager.tools()
 fetcher = Fetcher.tools(configManager)
@@ -132,7 +131,7 @@ def UpdateFullStockData(stockDict):
             print(f"No Data for {k}")
             Nodata+=1
             continue
-        if FullData[k]["data"].shape[0]==0 or k not in FullData:
+        if k not in FullData or FullData[k]["data"].shape[0]==0:
             print(f"{i}/{total} Data missing for  {k:10} so redownloading....")
             newfulldf=getFullData(k)
             FullData[k]={"data":newfulldf.values,"columns":list(map(lambda x:x[0],newfulldf.columns)),"index":newfulldf.index}            
@@ -214,6 +213,16 @@ def DowloadExpacitaly(stockDict,n=-1):
     Utility.tools.saveStockData(stockDict, configManager, len(stockDict))
 
 
+def checkIfStocksAreUpdated():
+    with open(_path_from_root("StockData/AllSTOCKS.pk"), "rb") as f:
+        FullData=pk.load(f)
+    dfdata=FullData[random.choice(list(FullData.keys()))] 
+    lastdata=dfdata["index"][-1]
+    lastworkingday=datetime.datetime.now()
+    if lastworkingday.weekday() in [5,6]:
+        lastworkingday=lastworkingday-datetime.timedelta(days=lastworkingday.weekday()-4)
+    return (lastworkingday-lastdata).days>0
+
 def updateStockData():
     stockDict = multiprocessing.Manager().dict()
     configManager.getConfig(ConfigManager.parser)
@@ -277,7 +286,7 @@ def upDateIndex(comudityFIle: str | None = None):
         olddata=pd.read_csv(comudityFIle,index_col=0)
         olddata.index=pd.to_datetime(olddata.index)
         lastdate=olddata.index[-1]
-        days=(datetime.now()-lastdate).days
+        days=(datetime.datetime.now()-lastdate).days
         if days<1: return
         period=str(days)+'d'
     else:
@@ -331,8 +340,9 @@ def saveIndexStocks():
 # Main function
 def main():
     # print(fetcher.fetchCodepip install --upgrade yfinances(12))
-    updateStockData()
-    # upDateIndex()
+    if checkIfStocksAreUpdated():
+        updateStockData()
+        upDateIndex()
 
 
 

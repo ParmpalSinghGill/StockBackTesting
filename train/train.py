@@ -10,7 +10,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-from data.dataset import SwingDataset
+from data.SwingDataset import SwingDataset
 from models.ml_models import MLModelWrapper
 from models.dl_models import DLModelWrapper
 from evaluate import Evaluator

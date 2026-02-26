@@ -135,7 +135,7 @@ def plotSupportAndRessitent(ticker:str,timeframe:str='1D',prd:int=10,loopback:in
     sr = SRChannels(period=prd,channel_width_percentage=channel_width_pct,min_strength=min_strength,max_num_sr=max_num_sr,loopback=loopback,SRSelection="Nearest",addstrengh=True)
     spandr=sr.getSupportAndRessitent(df)
     print(spandr)
-    # PlotChart(df[-150:],Trend=f"S&R for {ticker}",Bars=spandr)
+    PlotChart(df[-150:],Trend=f"S&R for {ticker}",Bars=spandr)
 
 # Example Usage
 def main(ticker):
