@@ -1,9 +1,11 @@
 
-data_path: "synthetic_data.pk"
-target_stock: null
-holding_period: 5
-target_pct: 0.02
-stop_loss_pct: 0.01
+data_path: "/media/parmpal/Data/Codes/MyCodes/StockS/StockBackTesting/StockData/AllSTOCKS.pk"
+source_tickers: ["HDFCBANK"]
+target_tickers: ["HDFCBANK"]
+holding_period: 20
+target_pct: 0.1
+stop_loss_pct: 0.05
+negative_label: -1
 train_end_date: "2023-12-31"
 test_start_date: "2024-01-01"
 feature_config: "configs/indicators_min.yaml"

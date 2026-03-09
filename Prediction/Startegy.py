@@ -7,6 +7,7 @@ import pandas as pd,pickle as pk
 import talib
 from Prediction.SuperTrend import SuperTrendPrediction
 from Prediction import CONFIG
+from DataProcessing.DataLoad import getData as _shared_get_data, getDatFrame as _shared_get_datframe
 
 
 # def MACDPrediciton(df,fastperiod=12,slowperiod=26,signalperiod=9,ndays=4):
@@ -233,19 +234,10 @@ def MakePrediciton(df):
 	return signal,side,currentPrice, stoploss, Target
 
 def getDatFrame(stockData):
-    try:
-        return pd.DataFrame(stockData["data"],columns=stockData["columns"],index=stockData["index"])
-    except Exception as e:
-        print(stockData)
-        raise e
+    return _shared_get_datframe(stockData)
 
 def getData(key=None):
-    with open("StockData/AllSTOCKS.pk", "rb") as f:
-        Fulldata=pk.load(f)
-    if key is None:
-        return Fulldata
-    else:
-        return getDatFrame(Fulldata[key])
+    return _shared_get_data(key)
 
 def getPredicitonForDate(df,date):
 	date=datetime.datetime.strptime(date,"%Y-%m-%d")

@@ -38,15 +38,22 @@ class MLModelWrapper:
     def __init__(self, model_type: str, params: Dict[str, Any]):
         self.model = ModelFactory.create_model(model_type, params)
         self.model_type = model_type
+        self.label_to_int = None
+        self.int_to_label = None
 
     def fit(self, X: pd.DataFrame, y: pd.Series):
         # Drop non-feature columns if present
         X_clean = self._preprocess(X)
-        self.model.fit(X_clean, y)
+        unique_labels = sorted(pd.Series(y).dropna().unique().tolist())
+        self.label_to_int = {label: i for i, label in enumerate(unique_labels)}
+        self.int_to_label = {i: label for label, i in self.label_to_int.items()}
+        y_encoded = pd.Series(y).map(self.label_to_int).values
+        self.model.fit(X_clean, y_encoded)
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         X_clean = self._preprocess(X)
-        return self.model.predict(X_clean)
+        pred_encoded = self.model.predict(X_clean)
+        return np.array([self.int_to_label[int(v)] for v in pred_encoded])
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         X_clean = self._preprocess(X)

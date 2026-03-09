@@ -1,10 +1,14 @@
 import os,time
 import difflib
-import pickle
 import pickle as pk
 import pandas as pd
+from core.paths import project_path
+from core.stock_io import split_dict_to_df, load_pickle, dump_pickle
 
-os.makedirs("StockData/INDEX", exist_ok=True)
+INDEX_DIR = project_path("StockData/INDEX")
+INDEX_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR = project_path("Results")
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 AllStocks=None
 ComditiyDict=None
@@ -24,27 +28,17 @@ tickerMapping = {
     14: "https://archives.nseindia.com/content/fo/fo_mktlots.csv"
 }
 
-os.makedirs("Results", exist_ok=True)
 def getDatFrame(stockData):
-    try:
-        return pd.DataFrame(stockData["data"],columns=stockData["columns"],index=stockData["index"])
-    except Exception as e:
-        print(stockData)
-        raise e
+    return split_dict_to_df(stockData)
 
 def readFile(path):
-    try:
-        with open(path, "rb") as f:
-            return  pk.load(f)
-    except FileNotFoundError:
-        with open("../"+path, "rb") as f:
-            return  pk.load(f)
+    return load_pickle(project_path(path))
             
 
 def getTickerFromName(name):
     global ComditiyDict
     if ComditiyDict is None:
-        ComditiyDict=pd.read_csv("StockData/EQUITY_L.csv")
+        ComditiyDict=pd.read_csv(project_path("StockData/EQUITY_L.csv"))
         ComditiyDict={row["NAME OF COMPANY"].lower():row["SYMBOL"] for i,row in ComditiyDict.iterrows()}
     name=name.lower().replace("ltd","limited")
     expcase={"adani port & sez limited":"ADANIPORTS"}
@@ -65,17 +59,15 @@ def getData(key=None):
     elif key in AllStocks:
         return getDatFrame(AllStocks[key])
     elif key in ['NIFTY50', 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14]:
-        IndexPath=f"StockData/INDEX/{key}.pk"
-        if not os.path.exists(IndexPath) or (time.time() - os.path.getmtime(IndexPath)) > 2629800: # ~30.4 days
+        IndexPath=project_path(f"StockData/INDEX/{key}.pk")
+        if (not IndexPath.exists()) or (time.time() - IndexPath.stat().st_mtime) > 2629800: # ~30.4 days
             symbollist=pd.read_csv(tickerMapping[key])["Symbol"].values
-            with open(IndexPath,"wb") as f:
-                pickle.dump(symbollist,f)
-        with open(IndexPath,"rb") as f:
-            symbollist=pickle.load(f)
+            dump_pickle(IndexPath, symbollist)
+        symbollist=load_pickle(IndexPath)
         return {k:v for k,v in AllStocks.items() if k in symbollist}
     else:
         if ComditiyDict is None:
-            ComditiyDict=pd.read_csv("StockData/EQUITY_L.csv")
+            ComditiyDict=pd.read_csv(project_path("StockData/EQUITY_L.csv"))
             ComditiyDict={row["NAME OF COMPANY"].lower():row["SYMBOL"] for i,row in ComditiyDict.iterrows()}
         if key.lower() in ComditiyDict:
             return getDatFrame(AllStocks[ComditiyDict[key.lower()]])            
@@ -92,8 +84,7 @@ def getData(key=None):
 
 
 def getMyStocks():
-    with open("DataProcessing/MyStock") as f:
+    with open(project_path("DataProcessing/MyStock")) as f:
         data=[d[:-1] for d in f.readlines()]
     return data
-
 

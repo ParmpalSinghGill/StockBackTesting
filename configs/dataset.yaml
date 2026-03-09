@@ -6,6 +6,9 @@ target_tickers: ["HDFCBANK"] # List of stocks to predict/test on. null means all
 holding_period: 10 # N days
 target_pct: 0.05 # 5% profit target
 stop_loss_pct: 0.02 # 2% stop loss
+negative_label: -1 # Stop-loss class label for 3-class setup (-1, 0, 1)
 train_end_date: "2023-12-31"
 test_start_date: "2024-01-01"
 feature_config: "configs/indicators_full.yaml" # or indicators_min.yaml
+dataset_mode: "tabular" # tabular | sequence (for LSTM/time-series)
+seq_length: 10 # lookback window used when dataset_mode=sequence

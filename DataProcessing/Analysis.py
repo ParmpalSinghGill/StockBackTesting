@@ -75,14 +75,16 @@ def analyze_continuous_uptrend_trades(min_trade_ret=10):
             # print(f"Error analyzing {ticker}: {e}")
             continue
 
-    # Sort and print
     results_df = pd.DataFrame(results)
+    if results_df.empty:
+        return results_df
+    return results_df.sort_values(by='TradeCount', ascending=False)
+
+
+def render_continuous_uptrend_results(results_df: pd.DataFrame):
     if not results_df.empty:
-        results_df = results_df.sort_values(by='TradeCount', ascending=False)
         print(results_df.to_string(index=False))
         print(f"\nTotal Stocks with trades: {len(results_df)}")
-        
-        # Optional: Save to CSV
         results_df.to_csv("Results/ContinuousUptrendTrades.csv", index=False)
         print("Results saved to Results/ContinuousUptrendTrades.csv")
     else:
@@ -148,4 +150,4 @@ def analyze_specific_ticker(ticker,min_trade_ret=10):
 
 if __name__ == "__main__":
     analyze_specific_ticker("ARMANFIN",min_trade_ret=30)
-    # analyze_continuous_uptrend_trades()
+    # render_continuous_uptrend_results(analyze_continuous_uptrend_trades())

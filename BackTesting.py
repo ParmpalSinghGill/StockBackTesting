@@ -286,7 +286,7 @@ def DobackTesting(df,Key="",ammount=10000,startindays=100,discountpercent=.002,m
         logger.info(f"Doing BackTesting from {CONFIG.STARTDATE}")
         startDate=datetime.datetime.strptime(CONFIG.STARTDATE,"%Y-%m-%d")
         df=df[startDate:]
-    elif CONFIG.STARTDATE is not None:
+    elif CONFIG.ENDDATE is not None:
         logger.info(f"Doing BackTesting from Start To {CONFIG.ENDDATE}")
         endDate=datetime.datetime.strptime(CONFIG.ENDDATE,"%Y-%m-%d")
         df=df[:endDate+datetime.timedelta(days=1)]
@@ -349,7 +349,7 @@ def AllStockMultProcessing(type="ALL",method="SL&T"):
         keys=stockdict.keys()
         stockdictlist=[stockdict for k in stockdict.keys()]
     elif type=="SELECTED":
-        keys = ["HDFCBANK","CIPLA"]
+        keys = ["HDFCBANK","CIPLA","RELIANCE"]
         stockdictlist = [stockdict for k in keys]
     else:
         with open("StockData/Indexices.pk","rb") as f:
@@ -371,8 +371,8 @@ def AllStockMultProcessing(type="ALL",method="SL&T"):
 if __name__ == '__main__':
     # AllStock()
     # stype="Nifty50"
-    # stype="SELECTED"
-    stype="ALL"
+    stype="SELECTED"
+    # stype="ALL"
     # method="SL&T"
     # method="TSL&T"
     method="TSL"

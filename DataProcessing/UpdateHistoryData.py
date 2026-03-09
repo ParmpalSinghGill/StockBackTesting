@@ -27,6 +27,8 @@ import classes.Fetcher as Fetcher
 import classes.ConfigManager as ConfigManager
 from classes.ColorText import colorText
 from alive_progress import alive_bar
+from core.paths import project_path
+from core.stock_io import split_dict_to_df
 # os.chdir("../")
 from datetime import date
 
@@ -90,15 +92,11 @@ if CHROMA_AVAILABLE:
 
 # Manage Execution flow
 def getDatFrame(stockData):
-    try:
-        return pd.DataFrame(stockData["data"],columns=stockData["columns"],index=stockData["index"])
-    except Exception as e:
-        print(stockData)
-        raise e
+    return split_dict_to_df(stockData)
 
 
 def _path_from_root(relative_path: str) -> str:
-    return os.path.join(PROJECT_ROOT, relative_path)
+    return str(project_path(relative_path))
 
 def getFullData(stockCode,append_exchange = ".NS"):
         return  yf.download(

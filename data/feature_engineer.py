@@ -1,15 +1,18 @@
 import pandas as pd
 import numpy as np
 import yaml
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 
 class FeatureEngineer:
     """
     Computes technical indicators based on configuration.
     """
-    def __init__(self, config_path: str):
-        with open(config_path, 'r') as f:
-            self.config = yaml.safe_load(f)
+    def __init__(self, config_source: Union[str, Dict[str, Any]]):
+        if isinstance(config_source, dict):
+            self.config = config_source
+        else:
+            with open(config_source, 'r') as f:
+                self.config = yaml.safe_load(f)
         self.indicators = self.config.get('indicators', [])
 
     def compute_features(self, df: pd.DataFrame) -> pd.DataFrame:

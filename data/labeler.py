@@ -6,11 +6,14 @@ class Labeler:
     """
     Generates labels for swing trading based on future price events.
     """
-    def __init__(self, target_pct: float, stop_loss_pct: float, holding_period: int,negative_label: int=0):
+    def __init__(self, target_pct: float, stop_loss_pct: float, holding_period: int,negative_label: int=0,stop_loss_check="low",target_check="high",exitOnGap=True):
         self.target_pct = target_pct
         self.stop_loss_pct = stop_loss_pct
         self.holding_period = holding_period
         self.negative_label = negative_label
+        self.stop_loss_check=stop_loss_check
+        self.target_check=target_check
+        self.exitOnGap=exitOnGap
 
     def create_labels(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -29,6 +32,9 @@ class Labeler:
         exit_dates = []
         holding_days_list = []
         returns = []
+        entry_price_list=[]
+        target_price_list=[]
+        stop_loss_price_list=[]
         
         # Pre-calculate price arrays for speed
         opens = df['Open'].values
@@ -38,27 +44,28 @@ class Labeler:
         dates = df.index
         
         n = len(df)
+        selectedIndex=dates[:n-self.holding_period]
         
-        for i in range(n):
+        for i in range(n-self.holding_period):
             # Cannot label the last N days fully if we strictly need N days, 
             # but here we just need to see what happens *within* N days.
             # If i + holding_period >= n, we look until the end of data.
             
-            entry_price = closes[i]
-            entry_date = dates[i]
+            entry_price = closes[i+1]
+            entry_date = dates[i+1]
             
             target_price = entry_price * (1 + self.target_pct)
             stop_price = entry_price * (1 - self.stop_loss_pct)
-            
+
             outcome = 0
             exit_date = None
             held_days = 0
             exit_price = entry_price # Default to entry if no movement (unlikely)
             
             # Look forward
-            end_idx = min(i + 1 + self.holding_period, n)
+            end_idx = min(i + 2 + self.holding_period, n)
             
-            for j in range(i + 1, end_idx):
+            for j in range(i + 2, end_idx):
                 # Check High for target and Low for stop
                 # Conservative assumption: Check Low first (Stop Loss) then High (Target) 
                 # to avoid optimistic bias on days where both are hit.
@@ -73,34 +80,50 @@ class Labeler:
                 current_date = dates[j]
                 
                 # Gap checks
-                if current_open <= stop_price:
-                    outcome = self.negative_label
-                    exit_date = current_date
-                    exit_price = current_open # Stopped at open gap
-                    held_days = (current_date - entry_date).days
-                    break
-                
-                if current_open >= target_price:
-                    outcome = 1
-                    exit_date = current_date
-                    exit_price = current_open # Target hit at open gap
-                    held_days = (current_date - entry_date).days
-                    break
+                if self.exitOnGap:
+                    if current_open <= stop_price:
+                        outcome = self.negative_label
+                        exit_date = current_date
+                        exit_price = current_open # Stopped at open gap
+                        held_days = (current_date - entry_date).days
+                        break
+                    
+                    if current_open >= target_price:
+                        outcome = 1
+                        exit_date = current_date
+                        exit_price = current_open # Target hit at open gap
+                        held_days = (current_date - entry_date).days
+                        break
                 
                 # Intraday checks
                 # Check Low against Stop
-                if current_low <= stop_price:
+                if self.stop_loss_check=="low" and  current_low <= stop_price:
                     outcome = self.negative_label
                     exit_date = current_date
                     exit_price = stop_price
                     held_days = (current_date - entry_date).days
                     break
+
+                if self.stop_loss_check=="close" and  current_close <= stop_price:
+                    outcome = self.negative_label
+                    exit_date = current_date
+                    exit_price = current_close
+                    held_days = (current_date - entry_date).days
+                    break
                 
                 # Check High against Target
-                if current_high >= target_price:
+                if self.target_check=="high" and  current_high >= target_price:
                     outcome = 1
                     exit_date = current_date
                     exit_price = target_price
+                    held_days = (current_date - entry_date).days
+                    break
+                    
+                # Check High against Target
+                if self.target_check=="close" and  current_close >= target_price:
+                    outcome = 1
+                    exit_date = current_date
+                    exit_price = current_close
                     held_days = (current_date - entry_date).days
                     break
             
@@ -129,13 +152,18 @@ class Labeler:
             exit_dates.append(exit_date)
             holding_days_list.append(held_days)
             returns.append((exit_price - entry_price) / entry_price)
-            
+            entry_price_list.append(entry_price)
+            target_price_list.append(target_price)
+            stop_loss_price_list.append(stop_price)
         result_df = pd.DataFrame({
             'label': labels,
             'entry_date': entry_dates,
             'exit_date': exit_dates,
             'holding_days': holding_days_list,
-            'trade_return': returns
-        }, index=df.index)
+            'trade_return': returns,
+            'Entry':entry_price_list,
+            'target':target_price_list,
+            'stop_loss':stop_loss_price_list
+        }, index=selectedIndex)
         
         return result_df

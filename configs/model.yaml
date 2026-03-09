@@ -1,5 +1,5 @@
 # Model Configuration
-model_type: "xgboost" # options: logistic_regression, random_forest, xgboost, lightgbm, catboost, mlp, lstm
+model_type: "xgboost" # options: logistic_regression, random_forest, xgboost, lightgbm, catboost, mlp, lstm, cnn
 
 # Hyperparameters for each model type
 params:
@@ -38,6 +38,15 @@ params:
     num_layers: 2
     dropout: 0.2
     seq_length: 10 # Lookback window
+    epochs: 20
+    batch_size: 32
+    learning_rate: 0.001
+
+  cnn:
+    conv_channels: [64, 128]
+    kernel_size: 3
+    hidden_dim: 64
+    dropout: 0.2
     epochs: 20
     batch_size: 32
     learning_rate: 0.001

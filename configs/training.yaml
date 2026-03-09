@@ -1,6 +1,10 @@
 # Training Configuration
+dataset_config_path: "configs/dataset.yaml"
+model_config_path: "configs/model.yaml"
 output_dir: "Results/experiment_1"
 save_model: true
+train_all_models: true
+comparison_csv: "model_comparison.csv"
 metrics:
   - "precision"
   - "recall"
